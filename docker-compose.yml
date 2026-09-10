@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -13,35 +11,44 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  tms:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  tms-api:
     build:
-      context: .
+      context: ./apps/tms-api
       dockerfile: Dockerfile
-      target: tms
     env_file:
       - .env
     environment:
-      NODE_ENV: production
-      PORT: 3000
+      PORT: 8000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
+      REDIS_URL: redis://redis:6379/0
     ports:
-      - "3000:3000"
+      - "8000:8000"
     depends_on:
       - postgres
+      - redis
 
-  admin:
+  admin-api:
     build:
-      context: .
+      context: ./apps/admin-api
       dockerfile: Dockerfile
-      target: admin
     env_file:
       - .env
     environment:
-      NODE_ENV: production
-      PORT: 3001
+      PORT: 8001
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
     ports:
-      - "3001:3001"
+      - "8001:8001"
     depends_on:
       - postgres
 
 volumes:
   postgres_data:
+  redis_data:

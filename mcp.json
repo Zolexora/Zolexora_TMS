@@ -46,19 +46,8 @@
       "url": "https://mcp.resend.com/mcp"
     },
     "cloudinary": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@cloudinary/asset-management",
-        "mcp",
-        "start"
-      ],
-      "env": {
-        "CLOUDINARY_CLOUD_NAME": "${CLOUDINARY_CLOUD_NAME}",
-        "CLOUDINARY_API_KEY": "${CLOUDINARY_API_KEY}",
-        "CLOUDINARY_API_SECRET": "${CLOUDINARY_API_SECRET}",
-        "CLOUDINARY_URL": "${CLOUDINARY_URL}"
-      }
+      "type": "http",
+      "url": "https://asset-management.mcp.cloudinary.com/mcp"
     },
     "fetch": {
       "command": "npx",

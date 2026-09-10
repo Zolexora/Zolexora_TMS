@@ -28,7 +28,7 @@ args = ["-y", "mongodb-mcp-server"]
 
 [mcp_servers.cloudinary]
 command = "npx"
-args = ["-y", "@cloudinary/asset-management", "mcp", "start"]
+args = ["-y", "@cloudinary/asset-management", "start", "--transport", "stdio"]
 
 [mcp_servers.github]
 command = "npx"

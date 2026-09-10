@@ -366,7 +366,7 @@ agy --print "Audit package.json"            # Execute prompt non-interactively a
 agy --continue                              # Resume most recent conversation
 agy --conversation <id>                     # Resume conversation by ID
 agy --effort high                           # Run session with maximum reasoning effort (low|medium|high)
-
+agy -dangerously-skip-permissions
 # MCP Management
 agy mcp list                                # List all registered MCP servers and status
 agy mcp add <name> <command> [args...]      # Add stdio MCP server

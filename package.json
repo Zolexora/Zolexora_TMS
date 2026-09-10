@@ -6,10 +6,9 @@
   "scripts": {
     "build:tms": "pnpm --filter tms run build",
     "build:admin": "pnpm --filter admin run build",
-    "lint:tms": "pnpm --filter tms run lint",
-    "lint:admin": "pnpm --filter admin run lint",
     "dev:tms": "pnpm --filter tms run dev",
     "dev:admin": "pnpm --filter admin run dev",
+    "test:backend": "apps/tms-api/.venv/bin/pytest apps/tms-api/tests/",
     "cli:check": "bash scripts/setup-cli-ecosystem.sh --check",
     "cli:setup": "bash scripts/setup-cli-ecosystem.sh",
     "cli:docs": "bash scripts/setup-cli-ecosystem.sh --docs",

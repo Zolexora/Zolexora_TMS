@@ -24,3 +24,14 @@ pnpm-debug.log*
 # OS / Editor
 .DS_Store
 *.pem
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+
+# TypeScript
+*.tsbuildinfo
