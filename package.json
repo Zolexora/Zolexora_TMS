@@ -1,0 +1,20 @@
+{
+  "name": "zolexora-tms",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.24.0",
+  "scripts": {
+    "build:tms": "pnpm --filter tms run build",
+    "build:admin": "pnpm --filter admin run build",
+    "lint:tms": "pnpm --filter tms run lint",
+    "lint:admin": "pnpm --filter admin run lint",
+    "dev:tms": "pnpm --filter tms run dev",
+    "dev:admin": "pnpm --filter admin run dev",
+    "cli:check": "bash scripts/setup-cli-ecosystem.sh --check",
+    "cli:setup": "bash scripts/setup-cli-ecosystem.sh",
+    "cli:docs": "bash scripts/setup-cli-ecosystem.sh --docs",
+    "ecosystem:check": "bash scripts/setup-cli-ecosystem.sh --check",
+    "ecosystem:setup": "bash scripts/setup-cli-ecosystem.sh",
+    "ecosystem:docs": "bash scripts/setup-cli-ecosystem.sh --docs"
+  }
+}

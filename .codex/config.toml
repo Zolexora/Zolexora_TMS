@@ -1,0 +1,35 @@
+[mcp_servers.cloudflare]
+url = "https://mcp.cloudflare.com/mcp"
+
+[mcp_servers.cloudflare-docs]
+url = "https://docs.mcp.cloudflare.com/mcp"
+
+[mcp_servers.cloudflare-bindings]
+url = "https://bindings.mcp.cloudflare.com/mcp"
+
+[mcp_servers.cloudflare-builds]
+url = "https://builds.mcp.cloudflare.com/mcp"
+
+[mcp_servers.cloudflare-observability]
+url = "https://observability.mcp.cloudflare.com/mcp"
+
+[mcp_servers.supabase]
+url = "https://mcp.supabase.com/mcp"
+
+[mcp_servers.resend]
+url = "https://mcp.resend.com/mcp"
+
+[mcp_servers.render]
+command = "render-mcp-server"
+
+[mcp_servers.mongodb]
+command = "npx"
+args = ["-y", "mongodb-mcp-server"]
+
+[mcp_servers.cloudinary]
+command = "npx"
+args = ["-y", "@cloudinary/asset-management", "mcp", "start"]
+
+[mcp_servers.github]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
