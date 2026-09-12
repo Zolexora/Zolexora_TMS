@@ -6,6 +6,10 @@ from sqlalchemy import select
 
 from app.db.session import get_db
 from app.auth.dependencies import AuthenticatedUser, require_platform_admin
+
+from app.services.tenant_migration.service import TenantMigrationService
+from .models import TenantMigrationJob
+
 from .models import (
     TenantDatabaseRegistry,
     OrganisationDatabaseAssignment,
@@ -13,7 +17,7 @@ from .models import (
     OrganisationMongodbAssignment,
     OrganisationStorageAssignment,
     PlatformAuditLog,
-    RegistryStatus,
+    RegistryStatus, MigrationStatus,
     ProviderType
 )
 from .schemas import (
@@ -24,7 +28,7 @@ from .schemas import (
     AssignStorageRequest
 )
 
-router = APIRouter(prefix="/platform/tenants", tags=["Platform Tenant Management"])
+router = APIRouter(prefix="/api/v1/platform/tenants", tags=["Platform Tenant Management"])
 
 @router.post("/databases", response_model=TenantDatabaseRegistryResponse, status_code=status.HTTP_201_CREATED)
 async def provision_database(
@@ -172,3 +176,29 @@ async def assign_storage(
     await db.commit()
     return {"message": "Storage assigned successfully"}
 
+
+@router.post("/{organisation_id}/migration/dry-run")
+async def run_dry_run_migration(
+    organisation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: AuthenticatedUser = Depends(require_platform_admin)
+):
+    service = TenantMigrationService(db)
+    job = await service.run_dry_run_migration(organisation_id, admin.id)
+    
+    if job.status == MigrationStatus.MIGRATION_FAILED:
+        return {
+            "status": job.status.value,
+            "error_summary": job.error_summary,
+            "reconciliation": job.reconciliation_result,
+            "validation": job.runtime_validation_result
+        }
+        
+    return {
+        "status": job.status.value,
+        "migration_id": str(job.id),
+        "destination_database": job.destination_database_identifier,
+        "row_counts": job.row_counts,
+        "reconciliation": job.reconciliation_result,
+        "validation": job.runtime_validation_result
+    }

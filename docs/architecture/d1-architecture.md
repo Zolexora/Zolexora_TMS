@@ -25,3 +25,8 @@
 
 ## Mitigation Strategy
 We must test D1 compatibility by creating a dry-run migration of one tenant before attempting production cutover. The backend currently uses an abstracted `TenantDatabaseProvider` which defaults to `PostgresTenantProvider`.
+
+## Phase 6.1 Implementation Findings
+1. We used Python's `Decimal` and canonical JSON conversion to preserve financial precision and complex data.
+2. A local SQLite database (`aiosqlite`) serves perfectly as a local testing adapter for D1, as their dialects are functionally identical for our use case.
+3. Enums must explicitly set `create_type=False` or be stripped during SQLite schema reflection to avoid SQL errors.

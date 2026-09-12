@@ -20,6 +20,21 @@ class RegistryStatus(str, enum.Enum):
     DECOMMISSIONED = "DECOMMISSIONED"
     PROVISIONING_FAILED = "PROVISIONING_FAILED"
 
+
+class MigrationStatus(str, enum.Enum):
+    NOT_STARTED = "NOT_STARTED"
+    VALIDATING_SOURCE = "VALIDATING_SOURCE"
+    PROVISIONING_DESTINATION = "PROVISIONING_DESTINATION"
+    SCHEMA_PREPARATION = "SCHEMA_PREPARATION"
+    DATA_EXPORT = "DATA_EXPORT"
+    DATA_TRANSFORMATION = "DATA_TRANSFORMATION"
+    DATA_IMPORT = "DATA_IMPORT"
+    RECONCILIATION = "RECONCILIATION"
+    RUNTIME_VALIDATION = "RUNTIME_VALIDATION"
+    PILOT_READY = "PILOT_READY"
+    MIGRATION_FAILED = "MIGRATION_FAILED"
+    MIGRATION_CANCELLED = "MIGRATION_CANCELLED"
+
 class TenantDatabaseRegistry(Base):
     __tablename__ = "tenant_database_registry"
 
@@ -96,3 +111,30 @@ class PlatformAuditLog(Base):
     payload = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
+
+from sqlalchemy.dialects.postgresql import JSONB
+
+class TenantMigrationJob(Base):
+    __tablename__ = "tenant_migration_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organisation_id = Column(UUID(as_uuid=True), ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False)
+    source_provider = Column(Enum(ProviderType), nullable=False)
+    destination_provider = Column(Enum(ProviderType), nullable=False)
+    destination_database_identifier = Column(String, nullable=True)
+    status = Column(Enum(MigrationStatus), nullable=False, default=MigrationStatus.NOT_STARTED)
+    
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    error_summary = Column(Text, nullable=True)
+    schema_version = Column(Integer, nullable=True)
+    
+    # store detailed results as JSON or JSONB
+    row_counts = Column(JSONB, nullable=True)
+    reconciliation_result = Column(JSONB, nullable=True)
+    runtime_validation_result = Column(JSONB, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

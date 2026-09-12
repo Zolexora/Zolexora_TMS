@@ -7,7 +7,9 @@ from app.modules.platform.models import (
     OrganisationStorageAssignment,
     PlatformAuditLog,
     ProviderType,
-    RegistryStatus
+    RegistryStatus,
+    TenantMigrationJob,
+    MigrationStatus
 )
 from app.modules.organisations.models import Organisation, OrganisationStatus, OrganisationType
 from app.modules.users.models import Profile
@@ -57,6 +59,8 @@ __all__ = [
     "PlatformAuditLog",
     "ProviderType",
     "RegistryStatus",
+    "TenantMigrationJob",
+    "MigrationStatus",
     "Organisation",
     "OrganisationStatus",
     "OrganisationType",
