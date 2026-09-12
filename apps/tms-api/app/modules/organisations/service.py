@@ -4,7 +4,6 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.audit.models import AuditLog
 from app.modules.organisations.models import Organisation, OrganisationStatus
 from app.modules.organisations.membership_models import OrganisationMember, MemberStatus
 from app.modules.roles.models import Role
@@ -80,22 +79,6 @@ async def complete_onboarding(
     db.add(member)
 
     # 5. Audit Log Entry
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org.id,
-        actor_user_id=user_id,
-        action="ORGANISATION_CREATED",
-        entity_type="organisation",
-        entity_id=org.id,
-        metadata_={
-            "organisation_name": org.name,
-            "organisation_type": org.organisation_type,
-            "initial_commander_id": str(user_id),
-        },
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    db.add(audit)
 
     await db.commit()
     await db.refresh(org)
@@ -196,16 +179,6 @@ async def invite_member(
     )
     db.add(member)
 
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org_id,
-        actor_user_id=actor_id,
-        action="USER_INVITED",
-        entity_type="organisation_member",
-        entity_id=member.id,
-        metadata_={"invited_email": req.email, "role_code": req.role_code},
-    )
-    db.add(audit)
 
     await db.commit()
     await db.refresh(member)
