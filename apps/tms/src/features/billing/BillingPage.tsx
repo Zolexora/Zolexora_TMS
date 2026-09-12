@@ -1,32 +1,52 @@
-import { useState } from 'react';
+import { useState, } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText,IndianRupee } from 'lucide-react';
+import { FileText, IndianRupee, AlertCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
 export function BillingPage() {
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [dueDate, setDueDate] = useState<string>(
+    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
 
   const { data: billingRecords, isLoading } = useQuery({
     queryKey: ['billing'],
     queryFn: () => apiClient<any[]>('/api/v1/billing')
   });
 
+  const pendingRecords = billingRecords?.filter(r => r.status === 'PENDING') || [];
+  
+  // Group selected by customer to ensure we don't mix them
+  const selectedRecords = pendingRecords.filter(r => selectedIds.includes(r.id));
+  const selectedCustomerIds = Array.from(new Set(selectedRecords.map(r => r.customer_id)));
+  const customerId = selectedCustomerIds.length === 1 ? selectedCustomerIds[0] : null;
+
   const generateMutation = useMutation({
-    mutationFn: (ids: string[]) => apiClient('/api/v1/invoices', {
-      method: 'POST',
-      body: JSON.stringify({ billing_record_ids: ids })
-    }),
+    mutationFn: () => {
+      if (!customerId) throw new Error("Must select duties for a single customer");
+      return apiClient('/api/v1/invoices', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          customer_id: customerId,
+          billing_record_ids: selectedIds,
+          due_date: dueDate
+        })
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['billing'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      queryClient.invalidateQueries({ queryKey: ['pnl'] });
       setSelectedIds([]);
       alert('Invoice created successfully! View it in the Invoices tab.');
+    },
+    onError: (err: any) => {
+      alert(`Error creating invoice: ${err.message || 'Unknown error'}`);
     }
   });
 
-  const pendingRecords = billingRecords?.filter(r => r.status === 'PENDING') || [];
-  
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
       setSelectedIds(pendingRecords.map(r => r.id));
@@ -43,17 +63,36 @@ export function BillingPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Billing Pipelines</h1>
-          <p className="text-sm text-slate-400">View pending financial snapshots ready to be consolidated into invoices.</p>
+          <h1 className="text-2xl font-bold text-white">Billing</h1>
+          <p className="text-sm text-slate-400">Select pending financial snapshots to generate customer invoices.</p>
         </div>
-        <button
-          onClick={() => generateMutation.mutateAsync(selectedIds)}
-          disabled={selectedIds.length === 0 || generateMutation.isPending}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition disabled:opacity-50"
-        >
-          {generateMutation.isPending ? 'Generating...' : `Generate Invoice (${selectedIds.length})`}
-        </button>
+        
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Due Date</label>
+            <input 
+              type="date" 
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            onClick={() => generateMutation.mutate()}
+            disabled={selectedIds.length === 0 || selectedCustomerIds.length > 1 || generateMutation.isPending}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition disabled:opacity-50"
+          >
+            {generateMutation.isPending ? 'Generating...' : `Generate Invoice (${selectedIds.length})`}
+          </button>
+        </div>
       </div>
+
+      {selectedCustomerIds.length > 1 && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          You have selected duties belonging to multiple customers. An invoice can only be generated for a single customer at a time.
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center p-12">
@@ -79,7 +118,7 @@ export function BillingPage() {
                     type="checkbox" 
                     onChange={handleSelectAll} 
                     checked={selectedIds.length === pendingRecords.length && pendingRecords.length > 0}
-                    className="rounded border-slate-700 bg-slate-800 text-indigo-500" 
+                    className="rounded border-slate-700 bg-slate-800 text-indigo-500 focus:ring-indigo-500" 
                   />
                 </th>
                 <th className="p-4 font-medium">Duty ID</th>
@@ -90,14 +129,14 @@ export function BillingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {pendingRecords.map(record => (
+              {pendingRecords.map((record: any) => (
                 <tr key={record.id} className="hover:bg-slate-800/30 transition">
                   <td className="p-4 text-center">
                     <input 
                       type="checkbox" 
                       checked={selectedIds.includes(record.id)}
                       onChange={() => handleSelect(record.id)}
-                      className="rounded border-slate-700 bg-slate-800 text-indigo-500" 
+                      className="rounded border-slate-700 bg-slate-800 text-indigo-500 focus:ring-indigo-500" 
                     />
                   </td>
                   <td className="p-4 text-slate-300 font-mono text-xs">{record.duty_id.split('-')[0]}</td>

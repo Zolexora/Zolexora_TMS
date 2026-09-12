@@ -48,14 +48,28 @@ const navigation: { section: string; items: NavItem[] }[] = [
     ],
   },
   {
-    section: 'Financials',
+    section: 'Billing',
     items: [
       { name: 'Billing', href: '/billing', icon: FileText },
       { name: 'Invoices', href: '/invoices', icon: FileText },
-      { name: 'Payments', href: '/payments', icon: CreditCard },
+      { name: 'Customer Payments', href: '/payments', icon: CreditCard },
+      { name: 'Receivables', href: '/receivables', icon: CreditCard },
+    ],
+  },
+  {
+    section: 'Vendor Payments',
+    items: [
       { name: 'Payables', href: '/payables', icon: Receipt },
+      { name: 'Vendor Settlements', href: '/vendor-settlements', icon: Receipt },
+      { name: 'Payment History', href: '/vendor-payments', icon: CreditCard },
+    ],
+  },
+  {
+    section: 'Finances',
+    items: [
       { name: 'Expenses', href: '/expenses', icon: Receipt },
-      { name: 'P&L Reports', href: '/reports/pnl', icon: FileText },
+      { name: 'Profit & Loss', href: '/reports/pnl', icon: FileText },
+      { name: 'Financial Periods', href: '/financial-periods', icon: FileText },
     ],
   },
   {

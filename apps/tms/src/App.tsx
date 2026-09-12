@@ -19,6 +19,10 @@ import { InvoicesPage } from './features/invoices/InvoicesPage';
 import { PaymentsPage } from './features/billing/PaymentsPage';
 import { PayablesPage } from './features/billing/PayablesPage';
 import { ExpensesPage } from './features/expenses/ExpensesPage';
+import { ReceivablesAgeingPage } from './features/billing/ReceivablesAgeingPage';
+import { VendorPaymentHistoryPage } from './features/billing/VendorPaymentHistoryPage';
+import { VendorSettlementsPage } from './features/billing/VendorSettlementsPage';
+import { FinancialPeriodsPage } from './features/reports/FinancialPeriodsPage';
 import { PnLReportsPage } from './features/reports/PnLReportsPage';
 import { SettingsPage } from './features/onboarding/SettingsPage';
 import { AuthCallback } from './features/auth/AuthCallback';
@@ -106,6 +110,10 @@ export function App() {
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/payables" element={<PayablesPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
+              <Route path="/receivables" element={<ReceivablesAgeingPage />} />
+              <Route path="/vendor-settlements" element={<VendorSettlementsPage />} />
+              <Route path="/vendor-payments" element={<VendorPaymentHistoryPage />} />
+              <Route path="/financial-periods" element={<FinancialPeriodsPage />} />
               <Route path="/reports/pnl" element={<PnLReportsPage />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/settings" element={<SettingsPage />} />
