@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { PasswordField } from "./password-field";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../features/auth/useAuth";
 
 const organisationTypes = [
   "Sole Proprietorship / Proprietor",
@@ -52,7 +53,7 @@ export function OnboardingForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
 
   const passwordValid = useMemo(() => {
     if (password.length < 8) return false;
@@ -67,30 +68,98 @@ export function OnboardingForm() {
     passwordValid &&
     password === confirmPassword;
 
+  const { session } = useAuth();
+  const [otp, setOtp] = useState("");
+  const [showOtpInput, setShowOtpInput] = useState(false);
+
   async function createAccount() {
     setIsSubmitting(true);
     setMessage("");
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: {
-          full_name: fullName,
-          organisation_name: organisationName,
-          organisation_type: organisationType,
-        },
-      },
-    });
-    setIsSubmitting(false);
 
-    if (error) {
-      setMessage(`Unable to create account: ${error.message}`);
+    let currentSession = session;
+
+    if (!currentSession) {
+      // Step A: Not authenticated yet. Sign up with Supabase.
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            organisation_name: organisationName,
+            organisation_type: organisationType,
+          },
+        },
+      });
+
+      if (error) {
+        setIsSubmitting(false);
+        setMessage(`Unable to create account: ${error.message}`);
+        return;
+      }
+
+      if (data.session) {
+        currentSession = data.session;
+      } else {
+        // Require OTP verification
+        setIsSubmitting(false);
+        setShowOtpInput(true);
+        setMessage("A verification code has been sent to your email.");
+        return;
+      }
+    }
+
+    await completeBackendOnboarding(currentSession);
+  }
+
+  async function verifyOtpAndComplete() {
+    setIsSubmitting(true);
+    setMessage("");
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: otp,
+      type: 'signup'
+    });
+
+    if (error || !data.session) {
+      setIsSubmitting(false);
+      setMessage(error?.message || "Invalid or expired OTP code.");
       return;
     }
 
-    setMessage("Account created. Check your email to verify your address before continuing.");
-    setTimeout(() => navigate("/login"), 3000);
+    await completeBackendOnboarding(data.session);
+  }
+
+  async function completeBackendOnboarding(activeSession: any) {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/onboarding`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${activeSession.access_token}`,
+          },
+          body: JSON.stringify({
+            name: organisationName,
+            organisation_type: organisationType,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to create organisation');
+      }
+
+      setMessage("Organisation created successfully! Entering Command Center...");
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1000);
+    } catch (err: any) {
+      setMessage(err.message);
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -150,10 +219,16 @@ export function OnboardingForm() {
           <button
             type="button"
             disabled={!isStepOneValid}
-            onClick={() => setStep(2)}
+            onClick={() => {
+              if (session) {
+                void createAccount();
+              } else {
+                setStep(2);
+              }
+            }}
             className="mt-2 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
           >
-            Next: Commander Details
+            {session ? (isSubmitting ? "Creating..." : "Create Workspace") : "Next: Commander Details"}
           </button>
         </>
       ) : (
@@ -221,22 +296,54 @@ export function OnboardingForm() {
             placeholder="Re-enter password"
           />
 
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="w-1/3 rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-700"
-            >
-              Back
-            </button>
-            <button
-              type="submit"
-              disabled={!isStepTwoValid || isSubmitting}
-              className="w-2/3 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
-            >
-              {isSubmitting ? "Creating Workspace..." : "Create Workspace"}
-            </button>
-          </div>
+          {showOtpInput ? (
+            <div className="flex flex-col gap-3 pt-2">
+              <label htmlFor="otp" className="text-sm font-medium text-slate-300">
+                Enter 6-digit Verification Code
+              </label>
+              <input
+                id="otp"
+                type="text"
+                maxLength={6}
+                value={otp}
+                onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))}
+                placeholder="000000"
+                className="w-full text-center tracking-widest text-xl rounded-lg border border-slate-700 bg-slate-900/80 px-3.5 py-3 font-mono text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => void verifyOtpAndComplete()}
+                disabled={otp.length < 6 || isSubmitting}
+                className="w-full mt-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {isSubmitting ? "Verifying..." : "Verify & Create Workspace"}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="w-1/3 rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-700"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                disabled={!isStepTwoValid || isSubmitting}
+                onClick={() => {
+                  if (session) {
+                    void createAccount();
+                  } else {
+                    void createAccount();
+                  }
+                }}
+                className="w-2/3 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {isSubmitting ? "Creating..." : "Create Workspace"}
+              </button>
+            </div>
+          )}
         </>
       )}
 

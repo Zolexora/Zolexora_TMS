@@ -22,11 +22,12 @@ export function LoginForm() {
   async function signInWithPassword() {
     setIsSubmitting(true);
     setMessage("");
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setIsSubmitting(false);
 
     if (error) {
-      setMessage("Unable to sign in. Check your email and password, then try again.");
+      setMessage(`Unable to sign in: ${error.message}`);
       return;
     }
 

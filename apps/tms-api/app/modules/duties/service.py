@@ -161,9 +161,29 @@ async def create_duty(
 
     # 2. Validate driver & vehicle if provided at creation
     if req.driver_id:
-        await validate_driver_eligibility(req.driver_id, org_id, req.scheduled_start_time, req.scheduled_end_time, None, db)
+        driver = await validate_driver_eligibility(req.driver_id, org_id, req.scheduled_start_time, req.scheduled_end_time, None, db)
     if req.vehicle_id:
-        await validate_vehicle_eligibility(req.vehicle_id, org_id, req.scheduled_start_time, req.scheduled_end_time, None, db)
+        vehicle = await validate_vehicle_eligibility(req.vehicle_id, org_id, req.scheduled_start_time, req.scheduled_end_time, None, db)
+        
+    if req.driver_id or req.vehicle_id:
+        from app.modules.compliance.engine import ComplianceEngine
+        evaluation = await ComplianceEngine.evaluate(
+            db=db,
+            organisation_id=org_id,
+            vehicle_id=req.vehicle_id,
+            driver_id=req.driver_id,
+            # Pass vendor_id if vehicle belongs to vendor
+            vendor_id=vehicle.vendor_id if (req.vehicle_id and vehicle) else None,
+        )
+        if evaluation.status == "BLOCK":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "COMPLIANCE_BLOCKED",
+                    "message": "Resource allocation blocked by compliance engine.",
+                    "issues": [i.model_dump(mode="json") for i in evaluation.blocking_issues]
+                }
+            )
 
     duty_num = f"DT-{datetime.datetime.now().year}-{uuid.uuid4().hex[:6].upper()}"
 
@@ -239,6 +259,24 @@ async def assign_duty(
     # 2. Transactional validation
     driver = await validate_driver_eligibility(req.driver_id, org_id, duty.scheduled_start_time, duty.scheduled_end_time, duty.id, db)
     vehicle = await validate_vehicle_eligibility(req.vehicle_id, org_id, duty.scheduled_start_time, duty.scheduled_end_time, duty.id, db)
+
+    from app.modules.compliance.engine import ComplianceEngine
+    evaluation = await ComplianceEngine.evaluate(
+        db=db,
+        organisation_id=org_id,
+        vehicle_id=vehicle.id,
+        driver_id=driver.id,
+        vendor_id=vehicle.vendor_id,
+    )
+    if evaluation.status == "BLOCK":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "COMPLIANCE_BLOCKED",
+                "message": "Resource assignment blocked by compliance engine.",
+                "issues": [i.model_dump(mode="json") for i in evaluation.blocking_issues]
+            }
+        )
 
     # 3. Supersede old assignments
     old_assign_stmt = select(DutyAssignment).where(

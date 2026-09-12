@@ -32,6 +32,10 @@ from app.modules.payments.models import Payment, PaymentStatus, PaymentAllocatio
 from app.modules.payables.models import Payable, PayableStatus, PayableLine, Settlement
 from app.modules.expenses.models import Expense, ExpenseCategory
 from app.modules.pl.models import FinancialAuditLog
+from app.modules.compliance.models import (
+    ComplianceCategory, ComplianceEntityType, ComplianceStatus, ComplianceVerificationAction,
+    ComplianceRequirement, ComplianceRecord, ComplianceVerification
+)
 
 __all__ = [
     "Base",
@@ -94,4 +98,11 @@ __all__ = [
     "Expense",
     "ExpenseCategory",
     "FinancialAuditLog",
+    "ComplianceCategory",
+    "ComplianceEntityType",
+    "ComplianceStatus",
+    "ComplianceVerificationAction",
+    "ComplianceRequirement",
+    "ComplianceRecord",
+    "ComplianceVerification",
 ]

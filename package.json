@@ -15,5 +15,8 @@
     "ecosystem:check": "bash scripts/setup-cli-ecosystem.sh --check",
     "ecosystem:setup": "bash scripts/setup-cli-ecosystem.sh",
     "ecosystem:docs": "bash scripts/setup-cli-ecosystem.sh --docs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.116.0"
   }
 }

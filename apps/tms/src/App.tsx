@@ -21,6 +21,8 @@ import { PayablesPage } from './features/billing/PayablesPage';
 import { ExpensesPage } from './features/expenses/ExpensesPage';
 import { PnLReportsPage } from './features/reports/PnLReportsPage';
 import { SettingsPage } from './features/onboarding/SettingsPage';
+import { AuthCallback } from './features/auth/AuthCallback';
+import CompliancePage from './pages/compliance/CompliancePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +87,7 @@ export function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<AuthPageWrapper><LoginForm /></AuthPageWrapper>} />
           <Route path="/onboarding" element={<AuthPageWrapper><OnboardingForm /></AuthPageWrapper>} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Protected Workspace Navigation */}
           <Route element={<ProtectedRoute />}>
@@ -93,10 +96,10 @@ export function App() {
               <Route path="/bookings" element={<BookingsPage />} />
               <Route path="/duties" element={<DutiesPage />} />
               <Route path="/dispatch" element={<DispatchPage />} />
-              <Route path="/vehicles" element={<VehiclesPage />} />
-              <Route path="/drivers" element={<DriversPage />} />
-              <Route path="/customers" element={<CustomersPage />} />
-              <Route path="/vendors" element={<VendorsPage />} />
+              <Route path="/compliance/vehicles" element={<VehiclesPage />} />
+              <Route path="/compliance/drivers" element={<DriversPage />} />
+              <Route path="/compliance/customers" element={<CustomersPage />} />
+              <Route path="/compliance/vendors" element={<VendorsPage />} />
               <Route path="/rate-cards" element={<RateCardsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/invoices" element={<InvoicesPage />} />
@@ -104,6 +107,7 @@ export function App() {
               <Route path="/payables" element={<PayablesPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/reports/pnl" element={<PnLReportsPage />} />
+              <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Route>

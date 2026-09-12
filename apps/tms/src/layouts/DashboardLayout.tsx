@@ -34,16 +34,17 @@ const navigation: { section: string; items: NavItem[] }[] = [
       { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
       { name: 'Duties', href: '/duties', icon: ClipboardList },
       { name: 'Dispatch Board', href: '/dispatch', icon: Radio },
+      { name: 'Rate Cards', href: '/rate-cards', icon: FileText },
     ],
   },
   {
-    section: 'Master Data & Fleet',
+    section: 'Compliance & Fleet',
     items: [
-      { name: 'Customers', href: '/customers', icon: Building2 },
-      { name: 'Vendors', href: '/vendors', icon: Building2 },
-      { name: 'Fleet Vehicles', href: '/vehicles', icon: Truck },
-      { name: 'Drivers', href: '/drivers', icon: Users },
-      { name: 'Rate Cards', href: '/rate-cards', icon: FileText },
+      { name: 'Dashboard', href: '/compliance', icon: Shield },
+      { name: 'Customers', href: '/compliance/customers', icon: Building2 },
+      { name: 'Vendors', href: '/compliance/vendors', icon: Building2 },
+      { name: 'Fleet Vehicles', href: '/compliance/vehicles', icon: Truck },
+      { name: 'Drivers', href: '/compliance/drivers', icon: Users },
     ],
   },
   {

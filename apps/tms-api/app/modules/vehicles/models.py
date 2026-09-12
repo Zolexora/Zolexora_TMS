@@ -22,6 +22,7 @@ class VehicleBodyType(str, enum.Enum):
 class VehicleOwnershipType(str, enum.Enum):
     OWNED = "OWNED"
     LEASED = "LEASED"
+    EMI = "EMI"
     ATTACHED = "ATTACHED"
 
 

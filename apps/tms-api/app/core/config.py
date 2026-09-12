@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = [
         "https://tms.zolexora.worker.dev",
         "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "http://localhost:3000",
     ]
 

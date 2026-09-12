@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, Search, AlertCircle, X } from 'lucide-react';
+import { Building2, Plus, Search, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import type { Vendor, VendorCreate } from '../../types';
+import { EntityComplianceManager } from '../compliance/EntityComplianceManager';
 
 export function VendorsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [complianceModalId, setComplianceModalId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
 
   const [formData, setFormData] = useState<VendorCreate>({
@@ -19,10 +21,6 @@ export function VendorsPage() {
     address: '',
     gstin: '',
     pan: '',
-    bank_account_name: '',
-    bank_account_number: '',
-    bank_ifsc: '',
-    bank_name: '',
   });
 
   const { data: vendors, isLoading } = useQuery({
@@ -51,30 +49,34 @@ export function VendorsPage() {
         address: '',
         gstin: '',
         pan: '',
-        bank_account_name: '',
-        bank_account_number: '',
-        bank_ifsc: '',
-        bank_name: '',
       });
       setFormError('');
     },
-    onError: (err: Error) => {
+    onError: (err: any) => {
       setFormError(err.message || 'Failed to create vendor');
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError('');
-    createMutation.mutate(formData);
+    if (!formData.name.trim()) {
+      setFormError('Vendor name is required.');
+      return;
+    }
+    
+    createMutation.mutate({
+      ...formData,
+      gstin: formData.gstin?.toUpperCase() || '',
+      pan: formData.pan?.toUpperCase() || '',
+    });
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Vendors & Fleet Suppliers</h1>
-          <p className="text-sm text-slate-400">Attached vehicle providers, workshops, fuel partners, and external brokers.</p>
+          <h1 className="text-2xl font-bold text-white">Vendors & Partners</h1>
+          <p className="text-sm text-slate-400">Market suppliers, agencies, and maintenance partners.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -89,28 +91,29 @@ export function VendorsPage() {
         <Search className="h-4 w-4 text-slate-500" />
         <input
           type="text"
-          placeholder="Search by vendor name or phone..."
+          placeholder="Search vendors by name or GSTIN..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none w-full"
         />
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
         <table className="w-full text-left text-sm text-slate-300">
-          <thead className="border-b border-slate-800 bg-slate-950/80 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <thead className="bg-slate-800/80 text-xs uppercase text-slate-400">
             <tr>
-              <th className="px-5 py-3.5">Vendor Name</th>
-              <th className="px-5 py-3.5">Category</th>
-              <th className="px-5 py-3.5">Contact</th>
-              <th className="px-5 py-3.5">Bank Settlement</th>
-              <th className="px-5 py-3.5">Status</th>
+              <th className="px-5 py-4 font-semibold">Vendor Name</th>
+              <th className="px-5 py-4 font-semibold">Type</th>
+              <th className="px-5 py-4 font-semibold">Contact</th>
+              <th className="px-5 py-4 font-semibold">Bank Settlement</th>
+              <th className="px-5 py-4 font-semibold">Status</th>
+              <th className="px-5 py-4 font-semibold">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-xs text-slate-500">
+                <td colSpan={6} className="px-5 py-8 text-center text-xs text-slate-500">
                   Loading vendors...
                 </td>
               </tr>
@@ -128,11 +131,11 @@ export function VendorsPage() {
                   </td>
                   <td className="px-5 py-4 text-xs">
                     <div>{v.contact_person || '---'}</div>
-                    <div className="text-slate-500">{v.phone || ''}</div>
+                    <div className="text-slate-500 font-mono">{v.phone || '---'}</div>
                   </td>
-                  <td className="px-5 py-4 text-xs font-mono">
-                    <div>{v.bank_account_number ? `A/C: ••••${v.bank_account_number.slice(-4)}` : '---'}</div>
-                    <div className="text-[11px] text-slate-500">{v.bank_ifsc || ''}</div>
+                  <td className="px-5 py-4 text-xs">
+                    <div className="text-slate-400">NEFT / RTGS</div>
+                    <div className="text-slate-500 font-mono text-[10px] mt-0.5">Pending setup</div>
                   </td>
                   <td className="px-5 py-4">
                     <span
@@ -145,15 +148,25 @@ export function VendorsPage() {
                       {v.status}
                     </span>
                   </td>
+                  <td className="px-5 py-4">
+                    <button
+                      onClick={() => setComplianceModalId(v.id)}
+                      className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-1 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
+                      title="Manage Compliance"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      Docs
+                    </button>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center">
+                <td colSpan={6} className="px-5 py-12 text-center">
                   <div className="flex flex-col items-center justify-center text-center">
                     <Building2 className="h-8 w-8 text-slate-600 mb-2" />
                     <p className="text-sm font-semibold text-slate-300">No vendors registered</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Click 'Add Vendor' to register vehicle suppliers or workshops.</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Click 'Add Vendor' to onboard a new supplier.</p>
                   </div>
                 </td>
               </tr>
@@ -161,6 +174,27 @@ export function VendorsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Compliance Modal */}
+      {complianceModalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-400" />
+                Vendor Compliance
+              </h2>
+              <button onClick={() => setComplianceModalId(null)} className="text-slate-400 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="dark">
+              <EntityComplianceManager entityType="VENDOR" entityId={complianceModalId} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (

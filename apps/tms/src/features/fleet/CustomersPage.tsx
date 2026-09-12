@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, Search, AlertCircle, X } from 'lucide-react';
+import { Building2, Plus, Search, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import type { Customer, CustomerCreate } from '../../types';
+import { EntityComplianceManager } from '../compliance/EntityComplianceManager';
 
 export function CustomersPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [complianceModalId, setComplianceModalId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
 
   const [formData, setFormData] = useState<CustomerCreate>({
@@ -18,8 +20,8 @@ export function CustomersPage() {
     billing_address: '',
     gstin: '',
     pan: '',
+    credit_limit: '0',
     payment_terms_days: 30,
-    credit_limit: '0.00',
   });
 
   const { data: customers, isLoading } = useQuery({
@@ -47,20 +49,29 @@ export function CustomersPage() {
         billing_address: '',
         gstin: '',
         pan: '',
+        credit_limit: '0',
         payment_terms_days: 30,
-        credit_limit: '0.00',
       });
       setFormError('');
     },
-    onError: (err: Error) => {
+    onError: (err: any) => {
       setFormError(err.message || 'Failed to create customer');
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError('');
-    createMutation.mutate(formData);
+    if (!formData.name.trim()) {
+      setFormError('Customer name is required.');
+      return;
+    }
+    
+    createMutation.mutate({
+      ...formData,
+      gstin: formData.gstin?.toUpperCase() || '',
+      pan: formData.pan?.toUpperCase() || '',
+      credit_limit: formData.credit_limit || '0',
+    });
   };
 
   return (
@@ -68,8 +79,8 @@ export function CustomersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Customers & Corporate Clients</h1>
-          <p className="text-sm text-slate-400">Directory of shippers, consignors, contracted rate terms, and GST details.</p>
+          <h1 className="text-2xl font-bold text-white">Customers & Clients</h1>
+          <p className="text-sm text-slate-400">Manage client billing, credit limits, and contact information.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -85,7 +96,7 @@ export function CustomersPage() {
         <Search className="h-4 w-4 text-slate-500" />
         <input
           type="text"
-          placeholder="Search by customer name or phone..."
+          placeholder="Search customers by name, GSTIN, or phone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none w-full"
@@ -93,22 +104,23 @@ export function CustomersPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
         <table className="w-full text-left text-sm text-slate-300">
           <thead className="border-b border-slate-800 bg-slate-950/80 text-xs font-semibold uppercase tracking-wider text-slate-400">
             <tr>
-              <th className="px-5 py-3.5">Customer Name</th>
-              <th className="px-5 py-3.5">Contact Person</th>
-              <th className="px-5 py-3.5">GSTIN / PAN</th>
-              <th className="px-5 py-3.5">Payment Terms</th>
-              <th className="px-5 py-3.5">Credit Limit</th>
-              <th className="px-5 py-3.5">Status</th>
+              <th className="px-5 py-4 font-semibold">Customer Name</th>
+              <th className="px-5 py-4 font-semibold">Contact</th>
+              <th className="px-5 py-4 font-semibold">GSTIN / PAN</th>
+              <th className="px-5 py-4 font-semibold">Payment Terms</th>
+              <th className="px-5 py-4 font-semibold">Credit Limit</th>
+              <th className="px-5 py-4 font-semibold">Status</th>
+              <th className="px-5 py-4 font-semibold">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-xs text-slate-500">
+                <td colSpan={7} className="px-5 py-8 text-center text-xs text-slate-500">
                   Loading customers...
                 </td>
               </tr>
@@ -137,15 +149,25 @@ export function CustomersPage() {
                       {c.status}
                     </span>
                   </td>
+                  <td className="px-5 py-4">
+                    <button
+                      onClick={() => setComplianceModalId(c.id)}
+                      className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-1 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
+                      title="Manage Compliance"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      Docs
+                    </button>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center">
+                <td colSpan={7} className="px-5 py-12 text-center">
                   <div className="flex flex-col items-center justify-center text-center">
                     <Building2 className="h-8 w-8 text-slate-600 mb-2" />
-                    <p className="text-sm font-semibold text-slate-300">No customers found</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Click 'Add Customer' to register your first client.</p>
+                    <p className="text-sm font-semibold text-slate-300">No customers registered</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Click 'Add Customer' to create a new client account.</p>
                   </div>
                 </td>
               </tr>
@@ -153,6 +175,27 @@ export function CustomersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Compliance Modal */}
+      {complianceModalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-400" />
+                Customer Compliance
+              </h2>
+              <button onClick={() => setComplianceModalId(null)} className="text-slate-400 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="dark">
+              <EntityComplianceManager entityType="CUSTOMER" entityId={complianceModalId} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (

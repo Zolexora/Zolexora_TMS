@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, Plus, Search, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import type { Driver, DriverCreate } from '../../types';
+import { EntityComplianceManager } from '../compliance/EntityComplianceManager';
 
 export function DriversPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [complianceModalId, setComplianceModalId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
 
   const [formData, setFormData] = useState<DriverCreate>({
@@ -54,15 +56,25 @@ export function DriversPage() {
       });
       setFormError('');
     },
-    onError: (err: Error) => {
+    onError: (err: any) => {
       setFormError(err.message || 'Failed to enroll driver');
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError('');
-    createMutation.mutate(formData);
+    if (!formData.full_name.trim() || !formData.phone.trim() || !formData.license_number.trim()) {
+      setFormError('Name, Phone, and License Number are required.');
+      return;
+    }
+    
+    // Auto clean license plate
+    const cleanedLicense = formData.license_number.toUpperCase().replace(/\s+/g, '');
+    
+    createMutation.mutate({
+      ...formData,
+      license_number: cleanedLicense,
+    });
   };
 
   return (
@@ -92,21 +104,21 @@ export function DriversPage() {
         />
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
         <table className="w-full text-left text-sm text-slate-300">
-          <thead className="border-b border-slate-800 bg-slate-950/80 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <thead className="bg-slate-800/80 text-xs uppercase text-slate-400">
             <tr>
-              <th className="px-5 py-3.5">Driver Name</th>
-              <th className="px-5 py-3.5">License & KYC</th>
-              <th className="px-5 py-3.5">Employment</th>
-              <th className="px-5 py-3.5">Compliance</th>
-              <th className="px-5 py-3.5">Status</th>
+              <th className="px-5 py-4 font-semibold">Driver Name & Phone</th>
+              <th className="px-5 py-4 font-semibold">License & KYC</th>
+              <th className="px-5 py-4 font-semibold">Type</th>
+              <th className="px-5 py-4 font-semibold">Status</th>
+              <th className="px-5 py-4 font-semibold">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-xs text-slate-500">
+                <td colSpan={6} className="px-5 py-8 text-center text-xs text-slate-500">
                   Loading drivers...
                 </td>
               </tr>
@@ -126,12 +138,6 @@ export function DriversPage() {
                       {d.driver_type}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-xs">
-                    <span className="inline-flex items-center gap-1 text-emerald-400">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      Verified
-                    </span>
-                  </td>
                   <td className="px-5 py-4">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -145,11 +151,21 @@ export function DriversPage() {
                       {d.status}
                     </span>
                   </td>
+                  <td className="px-5 py-4">
+                    <button
+                      onClick={() => setComplianceModalId(d.id)}
+                      className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-1 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
+                      title="Manage Compliance"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      Docs
+                    </button>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center">
+                <td colSpan={6} className="px-5 py-12 text-center">
                   <div className="flex flex-col items-center justify-center text-center">
                     <Users className="h-8 w-8 text-slate-600 mb-2" />
                     <p className="text-sm font-semibold text-slate-300">No drivers registered</p>
@@ -161,6 +177,27 @@ export function DriversPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Compliance Modal */}
+      {complianceModalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-400" />
+                Driver Compliance
+              </h2>
+              <button onClick={() => setComplianceModalId(null)} className="text-slate-400 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="dark">
+              <EntityComplianceManager entityType="DRIVER" entityId={complianceModalId} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (

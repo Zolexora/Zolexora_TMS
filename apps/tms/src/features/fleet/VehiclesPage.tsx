@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Truck, Plus, Search, AlertCircle, X, Navigation } from 'lucide-react';
+import { Truck, Plus, Search, AlertCircle, X, Navigation, ShieldCheck } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import type { Vehicle, VehicleCreate } from '../../types';
+import { EntityComplianceManager } from '../compliance/EntityComplianceManager';
 
 export function VehiclesPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [complianceModalId, setComplianceModalId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
 
   const [formData, setFormData] = useState<VehicleCreate>({
@@ -54,23 +56,34 @@ export function VehiclesPage() {
       });
       setFormError('');
     },
-    onError: (err: Error) => {
-      setFormError(err.message || 'Failed to register vehicle');
+    onError: (err: any) => {
+      setFormError(err.message || 'Failed to create vehicle');
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError('');
-    createMutation.mutate(formData);
+    if (!formData.registration_number.trim()) {
+      setFormError('Registration number is required.');
+      return;
+    }
+    
+    // Auto format number plate
+    const cleanedPlate = formData.registration_number.toUpperCase().replace(/\s+/g, '');
+    
+    createMutation.mutate({
+      ...formData,
+      registration_number: cleanedPlate,
+      payload_capacity_kg: formData.payload_capacity_kg ? formData.payload_capacity_kg.toString() : undefined,
+    });
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Commercial Fleet Vehicles</h1>
-          <p className="text-sm text-slate-400">Inventory of owned, leased, and market trucks with RC, FASTag, and GPS telemetry.</p>
+          <h1 className="text-2xl font-bold text-white">Fleet Vehicles</h1>
+          <p className="text-sm text-slate-400">Manage heavy commercial vehicles, ownership, and tracking devices.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -85,29 +98,30 @@ export function VehiclesPage() {
         <Search className="h-4 w-4 text-slate-500" />
         <input
           type="text"
-          placeholder="Search by registration number, make, or model..."
+          placeholder="Search by registration number..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none w-full"
         />
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
         <table className="w-full text-left text-sm text-slate-300">
-          <thead className="border-b border-slate-800 bg-slate-950/80 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <thead className="bg-slate-800/80 text-xs uppercase text-slate-400">
             <tr>
-              <th className="px-5 py-3.5">Registration & Model</th>
-              <th className="px-5 py-3.5">Type & Ownership</th>
-              <th className="px-5 py-3.5">Capacity & Fuel</th>
-              <th className="px-5 py-3.5">Telemetry & FASTag</th>
-              <th className="px-5 py-3.5">Odometer</th>
-              <th className="px-5 py-3.5">Status</th>
+              <th className="px-5 py-4 font-semibold">Registration</th>
+              <th className="px-5 py-4 font-semibold">Type & Ownership</th>
+              <th className="px-5 py-4 font-semibold">Specs</th>
+              <th className="px-5 py-4 font-semibold">Telematics</th>
+              <th className="px-5 py-4 font-semibold">Odometer</th>
+              <th className="px-5 py-4 font-semibold">Status</th>
+              <th className="px-5 py-4 font-semibold">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-xs text-slate-500">
+                <td colSpan={7} className="px-5 py-8 text-center text-xs text-slate-500">
                   Loading vehicles...
                 </td>
               </tr>
@@ -149,11 +163,21 @@ export function VehiclesPage() {
                       {v.status}
                     </span>
                   </td>
+                  <td className="px-5 py-4">
+                    <button
+                      onClick={() => setComplianceModalId(v.id)}
+                      className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-1 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
+                      title="Manage Compliance"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      Docs
+                    </button>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center">
+                <td colSpan={7} className="px-5 py-12 text-center">
                   <div className="flex flex-col items-center justify-center text-center">
                     <Truck className="h-8 w-8 text-slate-600 mb-2" />
                     <p className="text-sm font-semibold text-slate-300">No vehicles registered</p>
@@ -165,6 +189,27 @@ export function VehiclesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Compliance Modal */}
+      {complianceModalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-400" />
+                Vehicle Compliance
+              </h2>
+              <button onClick={() => setComplianceModalId(null)} className="text-slate-400 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="dark">
+              <EntityComplianceManager entityType="VEHICLE" entityId={complianceModalId} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (
