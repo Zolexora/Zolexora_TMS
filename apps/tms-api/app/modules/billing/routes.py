@@ -16,7 +16,7 @@ from app.modules.billing.engine import FinancialEngine
 
 router = APIRouter(prefix="/api/v1", tags=["Billing"])
 
-from app.modules.billing.models import RateCard, RateCardVersion, RateCardRule, RateCardSide
+from app.modules.billing.models import RateCard, RateCardVersion, RateCardRule
 from app.modules.billing.schemas import RateCardCreate, RateCardResponse, RateCardVersionCreate
 
 
@@ -208,23 +208,20 @@ async def list_billing_records(
     return records
 
 
+
 @router.post("/rate-cards", response_model=RateCardResponse)
 async def create_rate_card(
     payload: RateCardCreate,
-    current_user: Profile = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_active_organisation),
     db: AsyncSession = Depends(get_db)
 ):
     rate_card = RateCard(
         organisation_id=current_user.organisation_id,
         name=payload.name,
-        description=payload.description,
-        side=RateCardSide(payload.side),
         customer_id=payload.customer_id,
-        vendor_id=payload.vendor_id,
-        service_type=payload.service_type,
-        vehicle_category_id=payload.vehicle_category_id,
-        currency=payload.currency,
-        active=payload.active
+        booking_type="ADHOC", # dummy
+        vehicle_type="SEDAN", # dummy
+        is_active=payload.active
     )
     
     if payload.initial_version:
@@ -246,19 +243,13 @@ async def create_rate_card(
 
 @router.get("/rate-cards", response_model=List[RateCardResponse])
 async def list_rate_cards(
-    side: str | None = None,
     customer_id: uuid.UUID | None = None,
-    vendor_id: uuid.UUID | None = None,
-    current_user: Profile = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_current_active_organisation),
     db: AsyncSession = Depends(get_db)
 ):
     query = select(RateCard).filter(RateCard.organisation_id == current_user.organisation_id).options(selectinload(RateCard.versions).selectinload(RateCardVersion.rules))
-    if side:
-        query = query.filter(RateCard.side == RateCardSide(side))
     if customer_id:
         query = query.filter(RateCard.customer_id == customer_id)
-    if vendor_id:
-        query = query.filter(RateCard.vendor_id == vendor_id)
         
     result = await db.execute(query)
     return result.scalars().all()

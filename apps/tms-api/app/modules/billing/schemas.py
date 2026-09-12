@@ -39,14 +39,11 @@ class RateCardVersionResponse(RateCardVersionBase):
 
 class RateCardBase(BaseModel):
     name: str
-    description: Optional[str] = None
-    side: str # "CUSTOMER" or "VENDOR"
     customer_id: Optional[uuid.UUID] = None
-    vendor_id: Optional[uuid.UUID] = None
-    service_type: Optional[str] = None
-    vehicle_category_id: Optional[uuid.UUID] = None
-    currency: str = "INR"
-    active: bool = True
+    booking_type: str = "ADHOC"
+    vehicle_type: str = "SEDAN"
+    is_active: bool = True
+    active: bool = True # keep for compat
 
 class RateCardCreate(RateCardBase):
     initial_version: Optional[RateCardVersionCreate] = None

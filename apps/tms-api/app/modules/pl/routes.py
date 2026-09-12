@@ -1,3 +1,4 @@
+import uuid
 import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
@@ -102,3 +103,58 @@ async def get_pnl_summary(
         gross_profit=gross_profit,
         gross_margin_percentage=margin_pct
     )
+
+from app.modules.pl.models import FinancialPeriod, PeriodStatus
+from pydantic import BaseModel
+
+class PeriodCreateSchema(BaseModel):
+    period_name: str
+    start_date: datetime.date
+    end_date: datetime.date
+
+@router.post("/periods")
+async def create_financial_period(
+    req: PeriodCreateSchema,
+    db: AsyncSession = Depends(get_db),
+    current_org_user: AuthenticatedUser = Depends(get_current_active_organisation),
+    current_user: AuthenticatedUser = Depends(get_current_active_organisation)
+):
+    period = FinancialPeriod(
+        organisation_id=current_org_user.organisation_id,
+        period_name=req.period_name,
+        start_date=req.start_date,
+        end_date=req.end_date,
+        status=PeriodStatus.OPEN,
+        opened_at=datetime.datetime.now(datetime.timezone.utc)
+    )
+    db.add(period)
+    await db.commit()
+    return period
+
+@router.post("/periods/{period_id}/close")
+async def close_financial_period(
+    period_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_org_user: AuthenticatedUser = Depends(get_current_active_organisation),
+    current_user: AuthenticatedUser = Depends(get_current_active_organisation)
+):
+    from fastapi import HTTPException
+    query = await db.execute(select(FinancialPeriod).where(FinancialPeriod.id == period_id, FinancialPeriod.organisation_id == current_org_user.organisation_id))
+    period = query.scalar_one_or_none()
+    if not period:
+        raise HTTPException(404, "Period not found")
+        
+    period.status = PeriodStatus.CLOSED
+    period.closed_at = datetime.datetime.now(datetime.timezone.utc)
+    period.closed_by_user_id = current_user.user_id
+    
+    await db.commit()
+    return {"message": "Period closed"}
+
+@router.get("/periods")
+async def list_financial_periods(
+    db: AsyncSession = Depends(get_db),
+    current_org_user: AuthenticatedUser = Depends(get_current_active_organisation)
+):
+    query = await db.execute(select(FinancialPeriod).where(FinancialPeriod.organisation_id == current_org_user.organisation_id).order_by(FinancialPeriod.start_date.desc()))
+    return query.scalars().all()

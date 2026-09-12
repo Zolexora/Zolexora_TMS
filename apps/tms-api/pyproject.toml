@@ -23,6 +23,7 @@ dependencies = [
     "resend>=2.1.0",
     "sentry-sdk[fastapi]>=2.13.0",
     "python-multipart>=0.0.9",
+    "reportlab>=5.0.1",
 ]
 
 [dependency-groups]
@@ -40,3 +41,6 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "auto"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

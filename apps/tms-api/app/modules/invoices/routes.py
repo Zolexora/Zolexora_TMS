@@ -12,6 +12,12 @@ from app.modules.invoices.models import Invoice, InvoiceLine, InvoiceTaxLine, In
 from app.modules.billing.models import BillingRecord, BillingStatus, FinancialSnapshot, FinancialSnapshotLine
 import datetime
 
+from fastapi import BackgroundTasks
+from app.modules.invoices.pdf_service import generate_invoice_pdf_bytes
+from app.core.storage import upload_document_to_r2
+from app.modules.customers.models import Customer
+
+
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
 def _generate_invoice_number(db) -> str:
@@ -181,3 +187,138 @@ async def finalize_invoice(
                 
     await db.commit()
     return {"message": "Invoice finalized successfully"}
+
+
+@router.post("/{invoice_id}/pdf")
+async def generate_invoice_pdf(
+    invoice_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_org_user: AuthenticatedUser = Depends(get_current_active_organisation),
+):
+    query = await db.execute(
+        select(Invoice).options(selectinload(Invoice.lines), selectinload(Invoice.tax_lines))
+        .where(Invoice.id == invoice_id, Invoice.organisation_id == current_org_user.organisation_id)
+    )
+    invoice = query.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    if invoice.status == InvoiceStatus.DRAFT:
+        raise HTTPException(status_code=400, detail="Cannot generate PDF for DRAFT invoice")
+        
+    if invoice.pdf_url:
+        return {"pdf_url": invoice.pdf_url}
+        
+    # Get organization and customer details
+    from app.modules.organisations.models import Organisation
+    org_query = await db.execute(select(Organisation).where(Organisation.id == current_org_user.organisation_id))
+    org = org_query.scalar_one_or_none()
+    
+    cust_query = await db.execute(select(Customer).where(Customer.id == invoice.customer_id))
+    customer = cust_query.scalar_one_or_none()
+    
+    pdf_bytes = generate_invoice_pdf_bytes(invoice, org, customer)
+    
+    filename = f"{invoice.invoice_number}.pdf"
+    folder = f"zolexora/{current_org_user.organisation_id}/invoices"
+    
+    # Upload to R2
+    pdf_url = await upload_document_to_r2(
+        file_bytes=pdf_bytes,
+        filename=filename,
+        content_type="application/pdf",
+        folder=folder,
+        org_id=current_org_user.organisation_id
+    )
+    
+    invoice.pdf_url = pdf_url
+    await db.commit()
+    return {"pdf_url": invoice.pdf_url}
+
+
+@router.post("/{invoice_id}/cancel")
+async def cancel_invoice(
+    invoice_id: uuid.UUID,
+    reason: str,
+    db: AsyncSession = Depends(get_db),
+    current_org_user: AuthenticatedUser = Depends(get_current_active_organisation),
+):
+    query = await db.execute(
+        select(Invoice).where(Invoice.id == invoice_id, Invoice.organisation_id == current_org_user.organisation_id)
+    )
+    invoice = query.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    if invoice.status == InvoiceStatus.CANCELLED:
+        raise HTTPException(status_code=400, detail="Invoice is already cancelled")
+        
+    invoice.status = InvoiceStatus.CANCELLED
+    invoice.cancellation_reason = reason
+    
+    # Also unlock the financial snapshots
+    br_query = await db.execute(select(BillingRecord).where(BillingRecord.invoice_id == invoice.id))
+    for br in br_query.scalars().all():
+        if br.snapshot_id:
+            snap_query = await db.execute(select(FinancialSnapshot).where(FinancialSnapshot.id == br.snapshot_id))
+            snap = snap_query.scalar_one_or_none()
+            if snap:
+                snap.is_finalized = False
+        # Optional: unlink the billing record or set its status back to PENDING?
+        br.status = BillingStatus.PENDING
+        br.invoice_id = None
+        
+    await db.commit()
+    return {"message": "Invoice cancelled successfully"}
+
+@router.get("/reports/receivables-ageing")
+async def get_receivables_ageing(
+    db: AsyncSession = Depends(get_db),
+    current_org_user: AuthenticatedUser = Depends(get_current_active_organisation),
+):
+    """
+    Calculate Receivables Ageing Buckets for outstanding invoices.
+    Buckets: Current, 1-30 days, 31-60 days, 61-90 days, >90 days overdue.
+    """
+    query = await db.execute(
+        select(Invoice).where(
+            Invoice.organisation_id == current_org_user.organisation_id,
+            Invoice.status.in_([InvoiceStatus.FINALIZED, InvoiceStatus.PARTIALLY_PAID])
+        )
+    )
+    invoices = query.scalars().all()
+    
+    today = datetime.date.today()
+    
+    buckets = {
+        "current": Decimal("0.0"),
+        "1_30_days": Decimal("0.0"),
+        "31_60_days": Decimal("0.0"),
+        "61_90_days": Decimal("0.0"),
+        "over_90_days": Decimal("0.0"),
+        "total_outstanding": Decimal("0.0")
+    }
+    
+    for inv in invoices:
+        due_amount = inv.amount_due
+        if due_amount <= 0:
+            continue
+            
+        buckets["total_outstanding"] += due_amount
+        
+        days_overdue = (today - inv.due_date).days
+        
+        if days_overdue <= 0:
+            buckets["current"] += due_amount
+        elif 1 <= days_overdue <= 30:
+            buckets["1_30_days"] += due_amount
+        elif 31 <= days_overdue <= 60:
+            buckets["31_60_days"] += due_amount
+        elif 61 <= days_overdue <= 90:
+            buckets["61_90_days"] += due_amount
+        else:
+            buckets["over_90_days"] += due_amount
+            
+    return buckets

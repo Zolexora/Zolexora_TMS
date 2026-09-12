@@ -13,6 +13,13 @@ from app.modules.payables.schemas import (
 )
 from app.modules.payables.models import Payable, PayableLine, PayableStatus, Settlement
 
+from app.modules.invoices.pdf_service import generate_vendor_payable_pdf_bytes
+from app.core.storage import upload_document_to_r2
+from app.modules.organisations.models import Organisation
+from app.modules.vendors.models import Vendor
+from app.modules.drivers.models import Driver
+
+
 router = APIRouter(prefix="/payables", tags=["Payables"])
 
 
@@ -189,3 +196,51 @@ async def list_settlements_for_payable(
         .order_by(Settlement.created_at.desc())
     )
     return s_query.scalars().all()
+
+
+@router.post("/{payable_id}/pdf")
+async def generate_payable_pdf(
+    payable_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_org_user: AuthenticatedUser = Depends(get_current_active_organisation),
+):
+    query = await db.execute(
+        select(Payable).options(selectinload(Payable.lines))
+        .where(Payable.id == payable_id, Payable.organisation_id == current_org_user.organisation_id)
+    )
+    payable = query.scalar_one_or_none()
+    
+    if not payable:
+        raise HTTPException(status_code=404, detail="Payable not found")
+        
+    org_query = await db.execute(select(Organisation).where(Organisation.id == current_org_user.organisation_id))
+    org = org_query.scalar_one_or_none()
+    
+    vendor = None
+    if payable.vendor_id:
+        v_query = await db.execute(select(Vendor).where(Vendor.id == payable.vendor_id))
+        vendor = v_query.scalar_one_or_none()
+    elif payable.driver_id:
+        # Fallback to driver
+        d_query = await db.execute(select(Driver).where(Driver.id == payable.driver_id))
+        driver = d_query.scalar_one_or_none()
+        if driver:
+            # Create a mock vendor object for the PDF
+            class MockVendor:
+                name = f"{driver.first_name} {driver.last_name}"
+            vendor = MockVendor()
+            
+    pdf_bytes = generate_vendor_payable_pdf_bytes(payable, org, vendor)
+    
+    filename = f"{payable.reference_number}.pdf"
+    folder = f"zolexora/{current_org_user.organisation_id}/payables"
+    
+    pdf_url = await upload_document_to_r2(
+        file_bytes=pdf_bytes,
+        filename=filename,
+        content_type="application/pdf",
+        folder=folder,
+        org_id=current_org_user.organisation_id
+    )
+    
+    return {"pdf_url": pdf_url}

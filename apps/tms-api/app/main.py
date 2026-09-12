@@ -95,6 +95,7 @@ from app.modules.trips.routes import router as trips_router
 from app.modules.dispatch.routes import router as dispatch_router
 from app.modules.billing.routes import router as billing_router
 from app.modules.invoices.routes import router as invoices_router
+from app.modules.invoices.adjustment_routes import router as adjustments_router
 from app.modules.payables.routes import router as payables_router
 from app.modules.payments.routes import router as payments_router
 from app.modules.expenses.routes import router as expenses_router
@@ -115,6 +116,7 @@ app.include_router(trips_router)
 app.include_router(dispatch_router)
 app.include_router(billing_router)
 app.include_router(invoices_router)
+app.include_router(adjustments_router)
 app.include_router(payables_router)
 app.include_router(payments_router)
 app.include_router(expenses_router)
