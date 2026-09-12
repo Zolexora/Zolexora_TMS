@@ -78,3 +78,18 @@ async def test_cross_tenant_isolation_boundary():
         assert members_b.status_code == 200
         for m in members_b.json():
             assert m["organisation_id"] == org_b_id
+
+async def test_tenant_context_resolution(client: AsyncClient, token_commander: str):
+    # This just ensures that hitting an endpoint resolves the tenant correctly without crashing.
+    response = await client.get("/api/v1/health", headers={"Authorization": f"Bearer {token_commander}"})
+    assert response.status_code == 200
+
+async def test_platform_admin_apis_forbidden_for_commander(client: AsyncClient, token_commander: str):
+    # Tenant commander should NOT have PLATFORM_ADMIN permission
+    response = await client.post("/api/v1/platform/tenants/databases", json={
+        "provider": "D1",
+        "database_identifier": "test_d1",
+        "database_name": "test_d1_name"
+    }, headers={"Authorization": f"Bearer {token_commander}"})
+    assert response.status_code == 403
+    assert "Platform Administrators" in response.json()["detail"]

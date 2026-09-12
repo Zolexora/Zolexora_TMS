@@ -6,6 +6,10 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.tenant import TenantContext
+from app.modules.platform.models import ProviderType
+
+
 from app.auth.jwks import verify_supabase_jwt
 from app.db.session import get_db
 
@@ -139,5 +143,66 @@ async def get_current_active_organisation(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User does not belong to an active organisation. Onboarding required.",
+        )
+    return user
+
+
+async def get_tenant_context(
+    user: AuthenticatedUser = Depends(get_current_active_organisation),
+    db: AsyncSession = Depends(get_db),
+) -> TenantContext:
+    # Resolve assignments
+    query = text("""
+        SELECT 
+            da.assignment_status,
+            dr.provider as db_provider,
+            dr.database_identifier,
+            mr.cluster_identifier,
+            ma.database_name as mongo_db_name,
+            sa.cloudinary_folder_prefix,
+            sa.r2_bucket,
+            sa.r2_prefix
+        FROM public.organisation_database_assignments da
+        JOIN public.tenant_database_registry dr ON dr.id = da.database_registry_id
+        LEFT JOIN public.organisation_mongodb_assignments ma ON ma.organisation_id = da.organisation_id AND ma.status = 'ACTIVE'
+        LEFT JOIN public.tenant_mongodb_registry mr ON mr.id = ma.mongodb_registry_id
+        LEFT JOIN public.organisation_storage_assignments sa ON sa.organisation_id = da.organisation_id
+        WHERE da.organisation_id = :org_id AND da.assignment_status = 'ACTIVE'
+        LIMIT 1
+    """)
+    
+    result = await db.execute(query, {"org_id": user.organisation_id})
+    row = result.mappings().first()
+    
+    if not row:
+        # Fallback to defaults or raise error
+        # In transition phase, we might not have assignments for everyone, so we could assume POSTGRESQL for existing orgs
+        return TenantContext(
+            organisation_id=user.organisation_id,
+            tenant_database_provider=ProviderType.POSTGRESQL,
+            tenant_database_identifier="default_postgres",
+            mongodb_cluster_identifier=None,
+            mongodb_database_name=None,
+            cloudinary_prefix=f"zolexora/organisations/{user.organisation_id}/",
+            r2_bucket="tms-documents",
+            r2_prefix=f"organisations/{user.organisation_id}/"
+        )
+        
+    return TenantContext(
+        organisation_id=user.organisation_id,
+        tenant_database_provider=ProviderType(row["db_provider"]),
+        tenant_database_identifier=row["database_identifier"],
+        mongodb_cluster_identifier=row["cluster_identifier"],
+        mongodb_database_name=row["mongo_db_name"],
+        cloudinary_prefix=row["cloudinary_folder_prefix"] or f"zolexora/organisations/{user.organisation_id}/",
+        r2_bucket=row["r2_bucket"] or "tms-documents",
+        r2_prefix=row["r2_prefix"] or f"organisations/{user.organisation_id}/"
+    )
+
+async def require_platform_admin(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
+    if "PLATFORM_ADMIN" not in user.permissions:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Platform Administrators can perform this action",
         )
     return user

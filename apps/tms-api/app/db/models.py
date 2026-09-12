@@ -1,4 +1,14 @@
 from app.db.base import Base
+from app.modules.platform.models import (
+    TenantDatabaseRegistry,
+    OrganisationDatabaseAssignment,
+    TenantMongodbRegistry,
+    OrganisationMongodbAssignment,
+    OrganisationStorageAssignment,
+    PlatformAuditLog,
+    ProviderType,
+    RegistryStatus
+)
 from app.modules.organisations.models import Organisation, OrganisationStatus, OrganisationType
 from app.modules.users.models import Profile
 from app.modules.roles.models import Role, Permission, RolePermission
@@ -39,6 +49,14 @@ from app.modules.compliance.models import (
 
 __all__ = [
     "Base",
+    "TenantDatabaseRegistry",
+    "OrganisationDatabaseAssignment",
+    "TenantMongodbRegistry",
+    "OrganisationMongodbAssignment",
+    "OrganisationStorageAssignment",
+    "PlatformAuditLog",
+    "ProviderType",
+    "RegistryStatus",
     "Organisation",
     "OrganisationStatus",
     "OrganisationType",
