@@ -2,9 +2,13 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Plus, Search, ShieldCheck } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { RateCardForm } from './RateCardForm';
+
 
 export function RateCardsPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
 
   const { data: rateCards, isLoading } = useQuery({
     queryKey: ['rate-cards'],
@@ -23,7 +27,7 @@ export function RateCardsPage() {
           <h1 className="text-2xl font-bold text-white">Rate Cards & Rules</h1>
           <p className="text-sm text-slate-400">Manage deterministic pricing contracts and operational rules.</p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition">
+        <button onClick={() => setIsFormOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition">
           <Plus className="h-4 w-4" />
           Create Rate Card
         </button>
@@ -89,6 +93,7 @@ export function RateCardsPage() {
           ))}
         </div>
       )}
+      {isFormOpen && <RateCardForm onClose={() => setIsFormOpen(false)} />}
     </div>
   );
 }

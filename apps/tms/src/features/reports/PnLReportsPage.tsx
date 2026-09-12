@@ -1,67 +1,89 @@
 import { useQuery } from '@tanstack/react-query';
-import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { IndianRupee, TrendingUp, TrendingDown, Activity, AlertCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
 export function PnLReportsPage() {
-  const { data: pnl, isLoading } = useQuery({
-    queryKey: ['pnl-summary'],
+  const { data: plSummary, isLoading } = useQuery({
+    queryKey: ['pl-summary'],
     queryFn: () => apiClient<any>('/api/v1/pl/summary')
   });
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center p-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-indigo-500"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">P&L Financial Reports</h1>
-          <p className="text-sm text-slate-400">High-level financial health directly calculated from operations.</p>
+          <h1 className="text-2xl font-bold text-white">Profit & Loss Dashboard</h1>
+          <p className="text-sm text-slate-400">Live operational financial summary from invoices, payables, and expenses.</p>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
-          <div className="flex items-center gap-3 text-slate-400 mb-2">
-            <DollarSign className="h-5 w-5" />
-            <h3 className="font-medium">Total Net Revenue</h3>
-          </div>
-          <p className="text-3xl font-bold text-white">{pnl?.currency || 'INR'} {pnl?.total_revenue_net || '0.00'}</p>
-          <p className="text-xs text-slate-500 mt-2">From finalized invoices</p>
+      {isLoading ? (
+        <div className="flex justify-center p-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-indigo-500"></div>
         </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
-          <div className="flex items-center gap-3 text-slate-400 mb-2">
-            <TrendingDown className="h-5 w-5 text-rose-400" />
-            <h3 className="font-medium">Direct Costs</h3>
-          </div>
-          <p className="text-3xl font-bold text-white">{pnl?.currency || 'INR'} {pnl?.total_direct_costs || '0.00'}</p>
-          <p className="text-xs text-slate-500 mt-2">Payables and operational expenses</p>
-        </div>
-
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3 text-emerald-400">
-              <TrendingUp className="h-5 w-5" />
-              <h3 className="font-medium">Gross Profit</h3>
+      ) : !plSummary ? (
+        <div className="flex justify-center p-12 text-slate-400">Failed to load P&L summary.</div>
+      ) : (
+        <div className="grid gap-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
+              <div className="flex items-center gap-2 text-sm font-medium text-emerald-400 mb-2">
+                <TrendingUp className="h-4 w-4" /> Billed Revenue
+              </div>
+              <div className="text-3xl font-bold text-white">
+                <IndianRupee className="inline h-6 w-6 text-slate-500"/> {plSummary.total_revenue || 0}
+              </div>
+              <p className="text-xs text-slate-500 mt-2">From Finalized Invoices</p>
             </div>
-            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
-              {pnl?.gross_margin_percentage || '0.00'}% Margin
-            </span>
+            
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
+              <div className="flex items-center gap-2 text-sm font-medium text-rose-400 mb-2">
+                <TrendingDown className="h-4 w-4" /> Vendor Costs
+              </div>
+              <div className="text-3xl font-bold text-white">
+                <IndianRupee className="inline h-6 w-6 text-slate-500"/> {plSummary.total_payables || 0}
+              </div>
+              <p className="text-xs text-slate-500 mt-2">From Approved Payables</p>
+            </div>
+            
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-400 mb-2">
+                <Activity className="h-4 w-4" /> Operational Expenses
+              </div>
+              <div className="text-3xl font-bold text-white">
+                <IndianRupee className="inline h-6 w-6 text-slate-500"/> {plSummary.total_expenses || 0}
+              </div>
+              <p className="text-xs text-slate-500 mt-2">Fuel, Tolls, Maint.</p>
+            </div>
+            
+            <div className="rounded-2xl border border-slate-800 bg-indigo-900/20 p-6">
+              <div className="flex items-center gap-2 text-sm font-medium text-indigo-400 mb-2">
+                <IndianRupee className="h-4 w-4" /> Gross Margin
+              </div>
+              <div className="text-3xl font-bold text-white">
+                <IndianRupee className="inline h-6 w-6 text-indigo-500"/> {plSummary.gross_profit || 0}
+              </div>
+              <p className="text-xs text-indigo-300 mt-2">
+                {plSummary.total_revenue > 0 ? 
+                  ((plSummary.gross_profit / plSummary.total_revenue) * 100).toFixed(1) + '%' 
+                  : '0%'} Margin
+              </p>
+            </div>
           </div>
-          <p className="text-3xl font-bold text-emerald-400">{pnl?.currency || 'INR'} {pnl?.gross_profit || '0.00'}</p>
+          
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
+            <div className="flex items-center gap-2 text-slate-400 mb-4">
+              <AlertCircle className="h-5 w-5" />
+              <h3 className="font-semibold text-white">Financial Independence Note</h3>
+            </div>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              In accordance with the Zolexora TMS financial architecture, <strong>Customer Price</strong> is completely decoupled from <strong>Vendor Cost</strong>. 
+              The revenue figures above are derived exclusively from the Customer-side deterministic Rate Cards evaluated at Duty completion, 
+              while the Vendor Costs are derived from the independent Provider-side Rate Cards (e.g. for DCOs or Fleet Owners).
+            </p>
+          </div>
         </div>
-      </div>
-      
-      {/* Visual placeholder for charts or breakdowns */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 mt-6 min-h-[300px] flex items-center justify-center">
-         <p className="text-slate-500">Detailed line-item breakdown coming soon...</p>
-      </div>
+      )}
     </div>
   );
 }
