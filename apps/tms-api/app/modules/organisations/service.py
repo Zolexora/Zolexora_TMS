@@ -2,6 +2,17 @@ import logging
 import uuid
 from fastapi import HTTPException, status
 from sqlalchemy import select
+
+from app.modules.platform.models import (
+    TenantDatabaseRegistry,
+    TenantMongodbRegistry,
+    OrganisationDatabaseAssignment,
+    OrganisationMongodbAssignment,
+    OrganisationStorageAssignment,
+    RegistryStatus,
+)
+from sqlalchemy import update
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.organisations.models import Organisation, OrganisationStatus
@@ -58,28 +69,97 @@ async def complete_onboarding(
             detail="Commander role definition is missing from database",
         )
 
+    org_id = uuid.uuid4()
+    
+    # 2.5 INFRASTRUCTURE ASSIGNMENT
+    # Find an AVAILABLE D1 database
+    d1_stmt = (
+        select(TenantDatabaseRegistry)
+        .where(TenantDatabaseRegistry.status == RegistryStatus.AVAILABLE)
+        .with_for_update(skip_locked=True)
+        .limit(1)
+    )
+    d1_res = await db.execute(d1_stmt)
+    d1_db = d1_res.scalars().first()
+    if not d1_db:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No D1 tenant databases are currently available for provisioning.",
+        )
+        
+    # Find an AVAILABLE MongoDB database
+    mongo_stmt = (
+        select(TenantMongodbRegistry)
+        .where(TenantMongodbRegistry.status == RegistryStatus.AVAILABLE)
+        .with_for_update(skip_locked=True)
+        .limit(1)
+    )
+    mongo_res = await db.execute(mongo_stmt)
+    mongo_db = mongo_res.scalars().first()
+    if not mongo_db:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No MongoDB tenant namespaces are currently available for provisioning.",
+        )
+    
+    # Mark them as assigned
+    d1_db.status = RegistryStatus.ASSIGNED
+    d1_db.assigned_organisation_id = org_id
+    
+    mongo_db.status = RegistryStatus.ASSIGNED
+
     # 3. Create Organisation
     org = Organisation(
-        id=uuid.uuid4(),
+        id=org_id,
         name=req.name.strip(),
         organisation_type=req.organisation_type.value,
-        status=OrganisationStatus.ACTIVE,
+        status=OrganisationStatus.ACTIVE, # In a fully asynchronous flow this would be PROVISIONING
     )
     db.add(org)
-    await db.flush()
 
     # 4. Assign initial creator as Commander
     member = OrganisationMember(
         id=uuid.uuid4(),
-        organisation_id=org.id,
+        organisation_id=org_id,
         user_id=user_id,
         role_id=commander_role.id,
         status=MemberStatus.ACTIVE,
     )
     db.add(member)
+    
+    # 4.5 Create Assignment Records
+    d1_assignment = OrganisationDatabaseAssignment(
+        id=uuid.uuid4(),
+        organisation_id=org_id,
+        database_registry_id=d1_db.id,
+        assignment_status="ACTIVE",
+        provisioning_status="READY"
+    )
+    db.add(d1_assignment)
+    
+    mongo_assignment = OrganisationMongodbAssignment(
+        id=uuid.uuid4(),
+        organisation_id=org_id,
+        mongodb_registry_id=mongo_db.id,
+        database_name=mongo_db.database_name,
+        namespace_prefix=f"zolexora_tenant_{org_id}",
+        status="ACTIVE"
+    )
+    db.add(mongo_assignment)
+    
+    storage_assignment = OrganisationStorageAssignment(
+        id=uuid.uuid4(),
+        organisation_id=org_id,
+        cloudinary_folder_prefix=f"zolexora/organisations/{org_id}/",
+        r2_bucket="tms-documents",
+        r2_prefix=f"organisations/{org_id}/"
+    )
+    db.add(storage_assignment)
 
     # 5. Audit Log Entry
+    # (assuming platform_audit_logs handles itself or we add one later)
 
+    # Atomically commit everything
     await db.commit()
     await db.refresh(org)
 
