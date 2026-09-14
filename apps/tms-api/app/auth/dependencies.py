@@ -175,17 +175,9 @@ async def get_tenant_context(
     row = result.mappings().first()
     
     if not row:
-        # Fallback to defaults or raise error
-        # In transition phase, we might not have assignments for everyone, so we could assume POSTGRESQL for existing orgs
-        return TenantContext(
-            organisation_id=user.organisation_id,
-            tenant_database_provider=ProviderType.POSTGRESQL,
-            tenant_database_identifier="default_postgres",
-            mongodb_cluster_identifier=None,
-            mongodb_database_name=None,
-            cloudinary_prefix=f"zolexora/organisations/{user.organisation_id}/",
-            r2_bucket="tms-documents",
-            r2_prefix=f"organisations/{user.organisation_id}/"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant infrastructure is not fully provisioned for this organisation.",
         )
         
     return TenantContext(

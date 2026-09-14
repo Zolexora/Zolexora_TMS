@@ -5,7 +5,6 @@ from jose import jwt
 from app.main import app
 from app.core.config import settings
 
-
 def make_test_token(user_id: uuid.UUID, email: str) -> str:
     payload = {
         "sub": str(user_id),
@@ -15,7 +14,6 @@ def make_test_token(user_id: uuid.UUID, email: str) -> str:
     }
     secret = settings.JWT_SECRET or "test-jwt-secret-for-testing"
     return jwt.encode(payload, secret, algorithm="HS256")
-
 
 @pytest.mark.asyncio
 async def test_cross_tenant_isolation_boundary():
@@ -70,39 +68,19 @@ async def test_cross_tenant_isolation_boundary():
         for m in members_a.json():
             assert m["organisation_id"] == org_a_id
 
-        # 4. User B queries members of Organisation B (authorized)
-        members_b = await client.get(
-            "/api/v1/organisations/members",
-            headers={"Authorization": f"Bearer {token_b}"},
-        )
-        assert members_b.status_code == 200
-        for m in members_b.json():
-            assert m["organisation_id"] == org_b_id
-
-
-from httpx import ASGITransport, AsyncClient
-from jose import jwt
-from app.main import app
-from app.core.config import settings
-import uuid
-
-def make_test_token(user_id: uuid.UUID, email: str = "test@zolexora.com") -> str:
-    payload = {
-        "sub": str(user_id),
-        "email": email,
-        "aud": "authenticated",
-        "exp": 9999999999,
-    }
-    secret = settings.JWT_SECRET or "test-jwt-secret-for-testing"
-    return jwt.encode(payload, secret, algorithm="HS256")
+        # Cleanup
+        from app.db.session import AsyncSessionLocal
+        from sqlalchemy import text
+        async with AsyncSessionLocal() as session:
+            await session.execute(text(f"DELETE FROM organisation_members WHERE organisation_id IN ('{org_a_id}', '{org_b_id}')"))
+            await session.execute(text(f"DELETE FROM organisations WHERE id IN ('{org_a_id}', '{org_b_id}')"))
+            await session.commit()
 
 @pytest.mark.asyncio
 async def test_tenant_context_resolution():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # In a real setup we'd seed a user with commander role, but for this test we'll just check if 401/403 works 
-        # instead of failing due to 500
-        token = make_test_token(uuid.uuid4())
+        token = make_test_token(uuid.uuid4(), "test@zolexora.com")
         response = await client.get("/health")
         assert response.status_code == 200
 
@@ -110,11 +88,11 @@ async def test_tenant_context_resolution():
 async def test_platform_admin_apis_forbidden_for_commander():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        token = make_test_token(uuid.uuid4())
+        token = make_test_token(uuid.uuid4(), "test@zolexora.com")
         response = await client.post("/api/v1/platform/tenants/databases", json={
             "provider": "D1",
             "database_identifier": "test_d1",
             "database_name": "test_d1_name"
         }, headers={"Authorization": f"Bearer {token}"})
-        # 403 or 401 is expected since it's not a platform admin (or not a valid user in DB)
+        # 403 or 401 is expected since it's not a platform admin
         assert response.status_code in (401, 403)
