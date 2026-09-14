@@ -102,6 +102,7 @@ from app.modules.expenses.routes import router as expenses_router
 from app.modules.pl.routes import router as pl_router
 from app.modules.compliance.routes import router as compliance_router
 from app.modules.platform.routes import router as platform_router
+from app.modules.auth.routes import router as auth_router
 
 app.include_router(health_router)
 app.include_router(organisations_router)
@@ -124,3 +125,4 @@ app.include_router(expenses_router)
 app.include_router(pl_router)
 app.include_router(compliance_router)
 app.include_router(platform_router)
+app.include_router(auth_router)

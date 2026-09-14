@@ -318,6 +318,31 @@ export function OnboardingForm() {
               >
                 {isSubmitting ? "Verifying..." : "Verify & Create Workspace"}
               </button>
+              
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await fetch("http://localhost:8000/api/v1/auth/resend-otp", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ email })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                      setMessage(data.detail || "Failed to resend OTP");
+                    } else {
+                      setMessage(`OTP resent. ${data.attempts_remaining} attempts remaining.`);
+                    }
+                  } catch (err) {
+                    setMessage("Failed to reach server to resend OTP.");
+                  }
+                }}
+                disabled={isSubmitting}
+                className="w-full mt-1 rounded-lg border border-slate-700 bg-transparent px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                Resend Code
+              </button>
             </div>
           ) : (
             <div className="flex gap-3 pt-2">
