@@ -174,7 +174,7 @@ async def verify():
     
     r2_status = await check_r2_provisioning()
     print("\nR2:")
-    print("- bucket: zolexora-tms-dev")
+    print("- bucket: tms-documents")
     print("- private/public status: PRIVATE")
     print(f"- tenant prefix validation: {r2_status}")
     

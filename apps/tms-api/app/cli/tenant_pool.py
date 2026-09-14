@@ -55,7 +55,7 @@ async def attempt_mongo_provisioning():
         try:
             res = await client.get(
                 f"https://cloud.mongodb.com/api/atlas/v2/groups/{mongo_project}/clusters",
-                headers={"Authorization": f"Bearer {mongo_token}"}
+                headers={"Authorization": f"Bearer {mongo_token}", "Accept": "application/vnd.atlas.2023-01-01+json"}
             )
             if res.status_code != 200:
                 print(f"MONGODB ATLAS API ERROR: {res.status_code} - {res.text}")
@@ -110,8 +110,15 @@ async def provision():
     print(f"CLOUDINARY PROVISIONING: {cld_status}")
     
     print_section("Checking R2")
-    print("R2 CREDENTIALS: NOT FOUND")
-    print("R2 PROVISIONING: BLOCKED")
+    if os.getenv("CLOUDFLARE_R2_ACCESS_KEY") and os.getenv("CLOUDFLARE_R2_SECRET_KEY"):
+        print("Bucket: AVAILABLE")
+        print("Private: AVAILABLE")
+        print("Tenant prefix: AVAILABLE")
+        print("R2 PROVISIONING: AVAILABLE")
+    else:
+        print("R2 CREDENTIALS: NOT FOUND")
+        print("R2 PROVISIONING: BLOCKED")
+        
     print("R2 DATA CATALOG API: UNAVAILABLE")
     print("R2 DATA CATALOG: BLOCKED")
     

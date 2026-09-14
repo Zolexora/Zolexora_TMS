@@ -2,11 +2,11 @@ import asyncio
 from sqlalchemy import text
 from app.db.session import AsyncSessionLocal
 
-async def clean():
+async def main():
     async with AsyncSessionLocal() as session:
-        await session.execute(text('DELETE FROM organisation_members'))
-        await session.execute(text('DELETE FROM organisations'))
+        await session.execute(text("DELETE FROM organisation_members"))
+        await session.execute(text("DELETE FROM organisations"))
         await session.commit()
-    print('Cleaned')
+        print("Cleaned!")
 
-asyncio.run(clean())
+asyncio.run(main())
