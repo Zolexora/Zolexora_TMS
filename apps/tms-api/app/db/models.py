@@ -19,13 +19,6 @@ from app.modules.audit.models import AuditLog
 from app.modules.customers.models import Customer, CustomerStatus
 from app.modules.vendors.models import Vendor, VendorType, VendorStatus
 from app.modules.drivers.models import Driver, DriverType, DriverStatus
-from app.modules.vehicles.models import (
-    Vehicle,
-    VehicleBodyType,
-    VehicleOwnershipType,
-    FuelType,
-    VehicleOperationalStatus,
-)
 from app.modules.billing.models import (
     RateCard, RateCardVersion, RateCardRule, RateRuleType,
     FinancialSnapshot, FinancialSnapshotLine, BillingRecord, BillingStatus
@@ -79,11 +72,6 @@ __all__ = [
     "Driver",
     "DriverType",
     "DriverStatus",
-    "Vehicle",
-    "VehicleBodyType",
-    "VehicleOwnershipType",
-    "FuelType",
-    "VehicleOperationalStatus",
     "RateCard",
     "RateCardVersion",
     "RateCardRule",
