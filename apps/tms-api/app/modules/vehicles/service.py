@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 from app.core.tenant import TenantContext
 from app.core.providers.database import D1TenantProvider
 from app.core.storage import upload_document_to_r2
-from app.modules.vehicles.models import (
+from app.modules.vehicles.enums import (
     VehicleBodyType,
     VehicleOperationalStatus,
     VehicleOwnershipType,

@@ -2,9 +2,7 @@ import datetime
 import uuid
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, ConfigDict, Field
-from app.modules.bookings.models import BookingStatus
-from app.modules.bookings.models_request import BookingServiceType, BookingType
-
+from app.modules.bookings.enums import BookingStatus, BookingServiceType, BookingType
 
 class BookingBase(BaseModel):
     customer_id: uuid.UUID
@@ -27,10 +25,8 @@ class BookingBase(BaseModel):
     operational_instructions: Optional[str] = None
     source: str = Field(default="MANUAL")
 
-
 class BookingCreate(BookingBase):
     pass
-
 
 class BookingUpdate(BaseModel):
     pickup_address: Optional[str] = None
@@ -43,7 +39,6 @@ class BookingUpdate(BaseModel):
     driver_requirements: Optional[Dict[str, Any]] = None
     operational_instructions: Optional[str] = None
     status: Optional[BookingStatus] = None
-
 
 class BookingResponse(BookingBase):
     model_config = ConfigDict(from_attributes=True)

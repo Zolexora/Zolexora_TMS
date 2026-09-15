@@ -1,29 +1,42 @@
 import datetime
 import uuid
+import json
 from typing import Optional
 from fastapi import HTTPException, status
-from sqlalchemy import desc, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import TenantContext
 from app.core.geocoding import geocoding_service
 from app.core.websocket import ws_manager
-from app.modules.audit.models import AuditLog
-from app.modules.bookings.models import Booking, BookingStatus
-from app.modules.bookings.schemas import BookingCreate, BookingResponse, BookingUpdate
-from app.modules.customers.models import Customer
+from app.modules.bookings.schemas import BookingCreate, BookingResponse, BookingUpdate, BookingStatus
+
+
+def _row_to_response(row: dict, org_id: uuid.UUID) -> dict:
+    # Handle JSON fields
+    for json_col in ["passenger_info", "cargo_info", "vehicle_requirements", "driver_requirements", "commercial_terms", "metadata_"]:
+        if json_col in row and isinstance(row[json_col], str):
+            try:
+                row[json_col] = json.loads(row[json_col])
+            except:
+                row[json_col] = {}
+                
+    row["organisation_id"] = org_id
+    if "metadata" in row and "metadata_" not in row:
+        row["metadata_"] = row.get("metadata", {})
+        
+    return row
 
 
 async def create_booking(
-    org_id: uuid.UUID,
-    actor_id: uuid.UUID,
+    ctx: TenantContext,
     req: BookingCreate,
-    db: AsyncSession,
 ) -> BookingResponse:
+    conn = await ctx.d1.get_connection()
+    
     # 1. Verify customer exists in tenant
-    c_stmt = select(Customer).where(Customer.id == req.customer_id, Customer.organisation_id == org_id)
-    c_res = await db.execute(c_stmt)
-    if not c_res.scalars().first():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found in organisation")
+    async with conn.execute("SELECT id FROM customers WHERE id = ?", (str(req.customer_id),)) as cursor:
+        c_res = await cursor.fetchone()
+        if not c_res:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found in organisation")
 
     # 2. Geocode coordinates if not provided
     p_lat, p_lng = req.pickup_lat, req.pickup_lng
@@ -38,129 +51,130 @@ async def create_booking(
         if d_geo:
             d_lat, d_lng = d_geo.latitude, d_geo.longitude
 
-    booking_num = f"BK-{datetime.datetime.now().year}-{uuid.uuid4().hex[:6].upper()}"
+    booking_id = str(uuid.uuid4())
+    booking_num = f"BK-{datetime.datetime.now().year}-{booking_id[:6].upper()}"
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    booking = Booking(
-        id=uuid.uuid4(),
-        booking_number=booking_num,
-        booking_request_id=req.booking_request_id,
-        organisation_id=org_id,
-        customer_id=req.customer_id,
-        booking_type=req.booking_type,
-        service_type=req.service_type,
-        pickup_address=req.pickup_address.strip(),
-        pickup_lat=p_lat,
-        pickup_lng=p_lng,
-        drop_address=req.drop_address.strip(),
-        drop_lat=d_lat,
-        drop_lng=d_lng,
-        pickup_datetime=req.pickup_datetime,
-        expected_completion_datetime=req.expected_completion_datetime,
-        passenger_info=req.passenger_info,
-        cargo_info=req.cargo_info,
-        vehicle_requirements=req.vehicle_requirements,
-        driver_requirements=req.driver_requirements,
-        commercial_terms=req.commercial_terms,
-        operational_instructions=req.operational_instructions,
-        status=BookingStatus.CONFIRMED,
-        source=req.source,
-        created_by_user_id=actor_id,
+    await conn.execute(
+        """
+        INSERT INTO bookings (
+            id, booking_number, booking_request_id, customer_id, service_type,
+            pickup_address, pickup_lat, pickup_lng, drop_address, drop_lat, drop_lng,
+            pickup_datetime, expected_completion_datetime, passenger_info, vehicle_requirements,
+            commercial_terms, operational_instructions, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            booking_id,
+            booking_num,
+            str(req.booking_request_id) if req.booking_request_id else None,
+            str(req.customer_id),
+            req.service_type.value,
+            req.pickup_address.strip(),
+            p_lat,
+            p_lng,
+            req.drop_address.strip(),
+            d_lat,
+            d_lng,
+            req.pickup_datetime.strftime("%Y-%m-%d %H:%M:%S") if req.pickup_datetime else None,
+            req.expected_completion_datetime.strftime("%Y-%m-%d %H:%M:%S") if req.expected_completion_datetime else None,
+            json.dumps(req.passenger_info),
+            json.dumps(req.vehicle_requirements),
+            json.dumps(req.commercial_terms),
+            req.operational_instructions,
+            BookingStatus.CONFIRMED.value,
+            now_str,
+            now_str
+        )
     )
-    db.add(booking)
 
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org_id,
-        actor_user_id=actor_id,
-        action="BOOKING_CREATED",
-        entity_type="booking",
-        entity_id=booking.id,
-        metadata_={"booking_number": booking.booking_number, "type": booking.booking_type.value},
-    )
-    db.add(audit)
-
-    await db.commit()
-    await db.refresh(booking)
+    # TODO: Add audit log to MongoDB
 
     await ws_manager.broadcast_to_org(
-        org_id,
+        ctx.organisation_id,
         "booking.created",
-        {"booking_id": str(booking.id), "booking_number": booking.booking_number, "customer_id": str(booking.customer_id)},
+        {"booking_id": booking_id, "booking_number": booking_num, "customer_id": str(req.customer_id)},
     )
 
-    return BookingResponse.model_validate(booking)
+    async with conn.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,)) as cursor:
+        row = await cursor.fetchone()
+        return BookingResponse.model_validate(_row_to_response(dict(row), ctx.organisation_id))
 
 
 async def list_bookings(
-    org_id: uuid.UUID,
-    db: AsyncSession,
+    ctx: TenantContext,
     status_filter: Optional[BookingStatus] = None,
     customer_id: Optional[uuid.UUID] = None,
     skip: int = 0,
     limit: int = 50,
 ) -> list[BookingResponse]:
-    stmt = select(Booking).where(Booking.organisation_id == org_id)
+    conn = await ctx.d1.get_connection()
+    
+    query = "SELECT * FROM bookings WHERE 1=1"
+    params = []
+    
     if status_filter:
-        stmt = stmt.where(Booking.status == status_filter)
+        query += " AND status = ?"
+        params.append(status_filter.value)
     if customer_id:
-        stmt = stmt.where(Booking.customer_id == customer_id)
-
-    stmt = stmt.order_by(desc(Booking.created_at)).offset(skip).limit(limit)
-    res = await db.execute(stmt)
-    rows = res.scalars().all()
-    return [BookingResponse.model_validate(r) for r in rows]
+        query += " AND customer_id = ?"
+        params.append(str(customer_id))
+        
+    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, skip])
+    
+    async with conn.execute(query, tuple(params)) as cursor:
+        rows = await cursor.fetchall()
+        return [BookingResponse.model_validate(_row_to_response(dict(r), ctx.organisation_id)) for r in rows]
 
 
 async def get_booking(
-    org_id: uuid.UUID,
+    ctx: TenantContext,
     booking_id: uuid.UUID,
-    db: AsyncSession,
 ) -> BookingResponse:
-    stmt = select(Booking).where(Booking.id == booking_id, Booking.organisation_id == org_id)
-    res = await db.execute(stmt)
-    booking = res.scalars().first()
-    if not booking:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
-    return BookingResponse.model_validate(booking)
+    conn = await ctx.d1.get_connection()
+    async with conn.execute("SELECT * FROM bookings WHERE id = ?", (str(booking_id),)) as cursor:
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+        return BookingResponse.model_validate(_row_to_response(dict(row), ctx.organisation_id))
 
 
 async def cancel_booking(
-    org_id: uuid.UUID,
+    ctx: TenantContext,
     booking_id: uuid.UUID,
-    actor_id: uuid.UUID,
     reason: Optional[str],
-    db: AsyncSession,
 ) -> BookingResponse:
-    stmt = select(Booking).where(Booking.id == booking_id, Booking.organisation_id == org_id)
-    res = await db.execute(stmt)
-    booking = res.scalars().first()
-    if not booking:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    conn = await ctx.d1.get_connection()
+    async with conn.execute("SELECT * FROM bookings WHERE id = ?", (str(booking_id),)) as cursor:
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+            
+        booking_dict = dict(row)
+        current_status = booking_dict.get("status")
 
-    if booking.status in (BookingStatus.COMPLETED, BookingStatus.CANCELLED):
+    if current_status in (BookingStatus.COMPLETED.value, BookingStatus.CANCELLED.value):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot cancel booking with status '{booking.status.value}'.",
+            detail=f"Cannot cancel booking with status '{current_status}'.",
         )
 
-    booking.status = BookingStatus.CANCELLED
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org_id,
-        actor_user_id=actor_id,
-        action="BOOKING_CANCELLED",
-        entity_type="booking",
-        entity_id=booking.id,
-        metadata_={"reason": reason or "User cancelled"},
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    await conn.execute(
+        "UPDATE bookings SET status = ?, updated_at = ? WHERE id = ?",
+        (BookingStatus.CANCELLED.value, now_str, str(booking_id))
     )
-    db.add(audit)
-    await db.commit()
-    await db.refresh(booking)
+
+    # TODO: Log audit to mongo
 
     await ws_manager.broadcast_to_org(
-        org_id,
+        ctx.organisation_id,
         "booking.cancelled",
-        {"booking_id": str(booking.id), "booking_number": booking.booking_number},
+        {"booking_id": str(booking_id), "booking_number": booking_dict.get("booking_number")},
     )
 
-    return BookingResponse.model_validate(booking)
+    async with conn.execute("SELECT * FROM bookings WHERE id = ?", (str(booking_id),)) as cursor:
+        updated_row = await cursor.fetchone()
+        return BookingResponse.model_validate(_row_to_response(dict(updated_row), ctx.organisation_id))
+

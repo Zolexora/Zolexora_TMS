@@ -3,7 +3,7 @@ from decimal import Decimal
 import uuid
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
-from app.modules.vehicles.models import (
+from app.modules.vehicles.enums import (
     VehicleBodyType,
     VehicleOwnershipType,
     FuelType,

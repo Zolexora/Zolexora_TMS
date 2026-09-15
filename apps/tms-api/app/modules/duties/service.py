@@ -2,556 +2,254 @@ import datetime
 import uuid
 from typing import Optional
 from fastapi import HTTPException, status
-from sqlalchemy import and_, desc, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import TenantContext
 from app.core.websocket import ws_manager
-from app.modules.audit.models import AuditLog
-from app.modules.bookings.models import Booking, BookingStatus
-from app.modules.drivers.models import Driver, DriverStatus
-from app.modules.duties.models import (
-    Duty,
-    DutyAssignment,
-    DutyAssignmentStatus,
-    DutyStatus,
-)
 from app.modules.duties.schemas import (
     DutyAssignRequest,
     DutyCreate,
-    DutyReassignRequest,
     DutyResponse,
+    DutyStatus,
 )
-from app.modules.vehicles.models import Vehicle, VehicleOperationalStatus
 
 
-async def validate_driver_eligibility(
-    driver_id: uuid.UUID,
-    org_id: uuid.UUID,
-    start_time: datetime.datetime,
-    end_time: datetime.datetime,
-    exclude_duty_id: Optional[uuid.UUID],
-    db: AsyncSession,
-) -> Driver:
-    # 1. Driver exists and belongs to organisation
-    stmt = select(Driver).where(Driver.id == driver_id, Driver.organisation_id == org_id)
-    res = await db.execute(stmt)
-    driver = res.scalars().first()
-    if not driver:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="DRIVER_NOT_FOUND: Driver does not exist in this organisation",
-        )
+def _row_to_response(row: dict, org_id: uuid.UUID) -> dict:
+    row["organisation_id"] = org_id
+    return row
 
-    if driver.status == DriverStatus.INACTIVE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="DRIVER_INACTIVE: Driver account is deactivated",
-        )
 
-    # 2. Driver licence compliance check
-    if not driver.license_number:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="DRIVER_LICENSE_MISSING: Driver does not have a commercial license registered",
-        )
-
-    if driver.license_expiry and driver.license_expiry < start_time.date():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"DRIVER_LICENSE_EXPIRED: Driver's commercial license expired on {driver.license_expiry}",
-        )
-
-    # 3. Conflict detection: check overlapping duties
-    conflict_stmt = select(Duty).where(
-        Duty.organisation_id == org_id,
-        Duty.driver_id == driver_id,
-        Duty.status.not_in([DutyStatus.CANCELLED, DutyStatus.DUTY_COMPLETED]),
-        and_(
-            Duty.scheduled_start_time < end_time,
-            Duty.scheduled_end_time > start_time,
-        ),
+async def _log_duty_event(conn, duty_id: str, actor_id: str, event_type: str, old_status: str, new_status: str, metadata: str = "{}"):
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    await conn.execute(
+        """
+        INSERT INTO duty_events (id, duty_id, actor_id, event_type, previous_status, new_status, event_metadata, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (str(uuid.uuid4()), duty_id, actor_id, event_type, old_status, new_status, metadata, now_str)
     )
-    if exclude_duty_id:
-        conflict_stmt = conflict_stmt.where(Duty.id != exclude_duty_id)
-
-    conflict_res = await db.execute(conflict_stmt)
-    conflict = conflict_res.scalars().first()
-    if conflict:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"DRIVER_ALREADY_ASSIGNED: Driver is already allocated to duty {conflict.duty_number} between {conflict.scheduled_start_time} and {conflict.scheduled_end_time}",
-        )
-
-    return driver
-
-
-async def validate_vehicle_eligibility(
-    vehicle_id: uuid.UUID,
-    org_id: uuid.UUID,
-    start_time: datetime.datetime,
-    end_time: datetime.datetime,
-    exclude_duty_id: Optional[uuid.UUID],
-    db: AsyncSession,
-) -> Vehicle:
-    # 1. Vehicle exists and belongs to organisation
-    stmt = select(Vehicle).where(Vehicle.id == vehicle_id, Vehicle.organisation_id == org_id)
-    res = await db.execute(stmt)
-    vehicle = res.scalars().first()
-    if not vehicle:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="VEHICLE_NOT_FOUND: Vehicle does not exist in this organisation",
-        )
-
-    # 2. Operational status check
-    if vehicle.status in [VehicleOperationalStatus.MAINTENANCE, VehicleOperationalStatus.DECOMMISSIONED]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"VEHICLE_NOT_OPERATIONAL: Vehicle is currently {vehicle.status.value}",
-        )
-
-    # 3. Conflict detection: check overlapping duties
-    conflict_stmt = select(Duty).where(
-        Duty.organisation_id == org_id,
-        Duty.vehicle_id == vehicle_id,
-        Duty.status.not_in([DutyStatus.CANCELLED, DutyStatus.DUTY_COMPLETED]),
-        and_(
-            Duty.scheduled_start_time < end_time,
-            Duty.scheduled_end_time > start_time,
-        ),
-    )
-    if exclude_duty_id:
-        conflict_stmt = conflict_stmt.where(Duty.id != exclude_duty_id)
-
-    conflict_res = await db.execute(conflict_stmt)
-    conflict = conflict_res.scalars().first()
-    if conflict:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"VEHICLE_ALREADY_ASSIGNED: Vehicle {vehicle.registration_number} is already allocated to duty {conflict.duty_number} during this time window",
-        )
-
-    return vehicle
 
 
 async def create_duty(
-    org_id: uuid.UUID,
-    actor_id: uuid.UUID,
+    ctx: TenantContext,
     req: DutyCreate,
-    db: AsyncSession,
 ) -> DutyResponse:
-    # 1. Verify booking exists and is confirmed
-    b_stmt = select(Booking).where(Booking.id == req.booking_id, Booking.organisation_id == org_id)
-    b_res = await db.execute(b_stmt)
-    booking = b_res.scalars().first()
-    if not booking:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    conn = await ctx.d1.get_connection()
+    
+    # 1. Verify booking exists
+    async with conn.execute("SELECT id FROM bookings WHERE id = ?", (str(req.booking_id),)) as cursor:
+        b_res = await cursor.fetchone()
+        if not b_res:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found in organisation")
 
-    if booking.status != BookingStatus.CONFIRMED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot create duty from booking with status '{booking.status.value}'. Must be CONFIRMED.",
-        )
-
-    if req.scheduled_end_time < req.scheduled_start_time:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Scheduled end time must be greater than or equal to scheduled start time",
-        )
-
-    # 2. Validate driver & vehicle if provided at creation
-    if req.driver_id:
-        driver = await validate_driver_eligibility(req.driver_id, org_id, req.scheduled_start_time, req.scheduled_end_time, None, db)
-    if req.vehicle_id:
-        vehicle = await validate_vehicle_eligibility(req.vehicle_id, org_id, req.scheduled_start_time, req.scheduled_end_time, None, db)
-        
-    if req.driver_id or req.vehicle_id:
-        from app.modules.compliance.engine import ComplianceEngine
-        evaluation = await ComplianceEngine.evaluate(
-            db=db,
-            organisation_id=org_id,
-            vehicle_id=req.vehicle_id,
-            driver_id=req.driver_id,
-            # Pass vendor_id if vehicle belongs to vendor
-            vendor_id=vehicle.vendor_id if (req.vehicle_id and vehicle) else None,
-        )
-        if evaluation.status == "BLOCK":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "error": "COMPLIANCE_BLOCKED",
-                    "message": "Resource allocation blocked by compliance engine.",
-                    "issues": [i.model_dump(mode="json") for i in evaluation.blocking_issues]
-                }
-            )
-
-    duty_num = f"DT-{datetime.datetime.now().year}-{uuid.uuid4().hex[:6].upper()}"
-
-    duty = Duty(
-        id=uuid.uuid4(),
-        duty_number=duty_num,
-        organisation_id=org_id,
-        booking_id=req.booking_id,
-        driver_id=req.driver_id,
-        vehicle_id=req.vehicle_id,
-        scheduled_start_time=req.scheduled_start_time,
-        scheduled_end_time=req.scheduled_end_time,
-        status=DutyStatus.ALLOCATED,
-        notes=req.notes,
-    )
-    db.add(duty)
-    await db.flush()
-
+    duty_id = str(uuid.uuid4())
+    duty_num = f"DTY-{datetime.datetime.now().year}-{duty_id[:6].upper()}"
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    init_status = DutyStatus.UNASSIGNED.value
     if req.driver_id and req.vehicle_id:
-        assignment = DutyAssignment(
-            id=uuid.uuid4(),
-            duty_id=duty.id,
-            driver_id=req.driver_id,
-            vehicle_id=req.vehicle_id,
-            assigned_by_user_id=actor_id,
-            status=DutyAssignmentStatus.ASSIGNED,
+        init_status = DutyStatus.ASSIGNED.value
+
+    await conn.execute(
+        """
+        INSERT INTO duties (
+            id, duty_number, booking_id, driver_id, vehicle_id, 
+            scheduled_start_time, scheduled_end_time, status, notes, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            duty_id,
+            duty_num,
+            str(req.booking_id),
+            str(req.driver_id) if req.driver_id else None,
+            str(req.vehicle_id) if req.vehicle_id else None,
+            req.scheduled_start_time.strftime("%Y-%m-%d %H:%M:%S"),
+            req.scheduled_end_time.strftime("%Y-%m-%d %H:%M:%S"),
+            init_status,
+            req.notes,
+            now_str,
+            now_str
         )
-        db.add(assignment)
-
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org_id,
-        actor_user_id=actor_id,
-        action="DUTY_CREATED",
-        entity_type="duty",
-        entity_id=duty.id,
-        metadata_={"duty_number": duty.duty_number, "booking_number": booking.booking_number},
     )
-    db.add(audit)
 
-    await db.commit()
-    await db.refresh(duty)
+    await _log_duty_event(conn, duty_id, str(ctx.user_id), "DUTY_CREATED", None, init_status)
 
     await ws_manager.broadcast_to_org(
-        org_id,
+        ctx.organisation_id,
         "duty.created",
-        {"duty_id": str(duty.id), "duty_number": duty.duty_number, "booking_id": str(duty.booking_id)},
+        {"duty_id": duty_id, "duty_number": duty_num, "booking_id": str(req.booking_id)},
     )
 
-    return DutyResponse.model_validate(duty)
-
-
-async def assign_duty(
-    org_id: uuid.UUID,
-    duty_id: uuid.UUID,
-    actor_id: uuid.UUID,
-    req: DutyAssignRequest,
-    db: AsyncSession,
-) -> DutyResponse:
-    # 1. Fetch duty
-    stmt = select(Duty).where(Duty.id == duty_id, Duty.organisation_id == org_id)
-    res = await db.execute(stmt)
-    duty = res.scalars().first()
-    if not duty:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
-
-    if duty.status in [DutyStatus.CANCELLED, DutyStatus.DUTY_COMPLETED]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot assign resources to duty in terminal status '{duty.status.value}'",
-        )
-
-    # 2. Transactional validation
-    driver = await validate_driver_eligibility(req.driver_id, org_id, duty.scheduled_start_time, duty.scheduled_end_time, duty.id, db)
-    vehicle = await validate_vehicle_eligibility(req.vehicle_id, org_id, duty.scheduled_start_time, duty.scheduled_end_time, duty.id, db)
-
-    from app.modules.compliance.engine import ComplianceEngine
-    evaluation = await ComplianceEngine.evaluate(
-        db=db,
-        organisation_id=org_id,
-        vehicle_id=vehicle.id,
-        driver_id=driver.id,
-        vendor_id=vehicle.vendor_id,
-    )
-    if evaluation.status == "BLOCK":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "error": "COMPLIANCE_BLOCKED",
-                "message": "Resource assignment blocked by compliance engine.",
-                "issues": [i.model_dump(mode="json") for i in evaluation.blocking_issues]
-            }
-        )
-
-    # 3. Supersede old assignments
-    old_assign_stmt = select(DutyAssignment).where(
-        DutyAssignment.duty_id == duty.id,
-        DutyAssignment.status == DutyAssignmentStatus.ASSIGNED,
-    )
-    old_assign_res = await db.execute(old_assign_stmt)
-    for old_asg in old_assign_res.scalars().all():
-        old_asg.status = DutyAssignmentStatus.SUPERSEDED
-
-    # 4. Insert new assignment
-    assignment = DutyAssignment(
-        id=uuid.uuid4(),
-        duty_id=duty.id,
-        driver_id=driver.id,
-        vehicle_id=vehicle.id,
-        assigned_by_user_id=actor_id,
-        status=DutyAssignmentStatus.ASSIGNED,
-    )
-    db.add(assignment)
-
-    duty.driver_id = driver.id
-    duty.vehicle_id = vehicle.id
-    duty.status = DutyStatus.ALLOCATED
-
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org_id,
-        actor_user_id=actor_id,
-        action="DUTY_ASSIGNED",
-        entity_type="duty",
-        entity_id=duty.id,
-        metadata_={
-            "duty_number": duty.duty_number,
-            "driver_name": driver.full_name,
-            "vehicle_reg": vehicle.registration_number,
-        },
-    )
-    db.add(audit)
-
-    await db.commit()
-    await db.refresh(duty)
-
-    await ws_manager.broadcast_to_org(
-        org_id,
-        "duty.assigned",
-        {
-            "duty_id": str(duty.id),
-            "duty_number": duty.duty_number,
-            "driver_id": str(driver.id),
-            "vehicle_id": str(vehicle.id),
-        },
-    )
-
-    return DutyResponse.model_validate(duty)
-
-
-async def dispatch_duty(
-    org_id: uuid.UUID,
-    duty_id: uuid.UUID,
-    actor_id: uuid.UUID,
-    db: AsyncSession,
-) -> DutyResponse:
-    stmt = select(Duty).where(Duty.id == duty_id, Duty.organisation_id == org_id)
-    res = await db.execute(stmt)
-    duty = res.scalars().first()
-    if not duty:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
-
-    if not duty.driver_id or not duty.vehicle_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot dispatch duty without both Driver and Vehicle allocated",
-        )
-
-    if duty.status != DutyStatus.ALLOCATED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot dispatch duty from status '{duty.status.value}'. Must be ALLOCATED.",
-        )
-
-    duty.status = DutyStatus.DISPATCHED
-    duty.dispatched_at = datetime.datetime.now(datetime.timezone.utc)
-    duty.dispatched_by_user_id = actor_id
-
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org_id,
-        actor_user_id=actor_id,
-        action="DUTY_DISPATCHED",
-        entity_type="duty",
-        entity_id=duty.id,
-        metadata_={"duty_number": duty.duty_number},
-    )
-    db.add(audit)
-
-    await db.commit()
-    await db.refresh(duty)
-
-    await ws_manager.broadcast_to_org(
-        org_id,
-        "duty.dispatched",
-        {"duty_id": str(duty.id), "duty_number": duty.duty_number},
-    )
-
-    return DutyResponse.model_validate(duty)
-
-
-async def driver_accept_duty(
-    org_id: uuid.UUID,
-    duty_id: uuid.UUID,
-    driver_user_id: uuid.UUID,
-    db: AsyncSession,
-) -> DutyResponse:
-    stmt = select(Duty).where(Duty.id == duty_id, Duty.organisation_id == org_id)
-    res = await db.execute(stmt)
-    duty = res.scalars().first()
-    if not duty:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
-
-    # Update assignment
-    asg_stmt = select(DutyAssignment).where(
-        DutyAssignment.duty_id == duty.id,
-        DutyAssignment.status == DutyAssignmentStatus.ASSIGNED,
-    ).order_by(desc(DutyAssignment.assigned_at))
-    asg_res = await db.execute(asg_stmt)
-    asg = asg_res.scalars().first()
-    if asg:
-        asg.status = DutyAssignmentStatus.ACCEPTED
-        asg.accepted_at = datetime.datetime.now(datetime.timezone.utc)
-
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org_id,
-        actor_user_id=driver_user_id,
-        action="DRIVER_ACCEPTED_DUTY",
-        entity_type="duty",
-        entity_id=duty.id,
-        metadata_={"duty_number": duty.duty_number},
-    )
-    db.add(audit)
-    await db.commit()
-    await db.refresh(duty)
-
-    await ws_manager.broadcast_to_org(
-        org_id,
-        "duty.driver_accepted",
-        {"duty_id": str(duty.id), "duty_number": duty.duty_number},
-    )
-
-    return DutyResponse.model_validate(duty)
-
-
-async def driver_reject_duty(
-    org_id: uuid.UUID,
-    duty_id: uuid.UUID,
-    driver_user_id: uuid.UUID,
-    reason: Optional[str],
-    db: AsyncSession,
-) -> DutyResponse:
-    stmt = select(Duty).where(Duty.id == duty_id, Duty.organisation_id == org_id)
-    res = await db.execute(stmt)
-    duty = res.scalars().first()
-    if not duty:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
-
-    asg_stmt = select(DutyAssignment).where(
-        DutyAssignment.duty_id == duty.id,
-        DutyAssignment.status == DutyAssignmentStatus.ASSIGNED,
-    ).order_by(desc(DutyAssignment.assigned_at))
-    asg_res = await db.execute(asg_stmt)
-    asg = asg_res.scalars().first()
-    if asg:
-        asg.status = DutyAssignmentStatus.REJECTED
-        asg.rejected_at = datetime.datetime.now(datetime.timezone.utc)
-        asg.rejection_reason = reason or "Driver declined duty"
-
-    # Reset allocation on duty so dispatcher can reallocate
-    duty.driver_id = None
-    duty.status = DutyStatus.ALLOCATED
-
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org_id,
-        actor_user_id=driver_user_id,
-        action="DRIVER_REJECTED_DUTY",
-        entity_type="duty",
-        entity_id=duty.id,
-        metadata_={"duty_number": duty.duty_number, "reason": reason or "No reason provided"},
-    )
-    db.add(audit)
-    await db.commit()
-    await db.refresh(duty)
-
-    await ws_manager.broadcast_to_org(
-        org_id,
-        "duty.driver_rejected",
-        {"duty_id": str(duty.id), "duty_number": duty.duty_number, "reason": reason},
-    )
-
-    return DutyResponse.model_validate(duty)
-
-
-async def update_duty_milestone(
-    org_id: uuid.UUID,
-    duty_id: uuid.UUID,
-    actor_id: uuid.UUID,
-    target_status: DutyStatus,
-    db: AsyncSession,
-) -> DutyResponse:
-    stmt = select(Duty).where(Duty.id == duty_id, Duty.organisation_id == org_id)
-    res = await db.execute(stmt)
-    duty = res.scalars().first()
-    if not duty:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
-
-    duty.status = target_status
-    if target_status == DutyStatus.IN_TRANSIT and not duty.actual_start_time:
-        duty.actual_start_time = datetime.datetime.now(datetime.timezone.utc)
-    elif target_status == DutyStatus.DUTY_COMPLETED:
-        duty.actual_end_time = datetime.datetime.now(datetime.timezone.utc)
-
-    audit = AuditLog(
-        id=uuid.uuid4(),
-        organisation_id=org_id,
-        actor_user_id=actor_id,
-        action=f"DUTY_STATUS_{target_status.value}",
-        entity_type="duty",
-        entity_id=duty.id,
-        metadata_={"duty_number": duty.duty_number, "new_status": target_status.value},
-    )
-    db.add(audit)
-    await db.commit()
-    await db.refresh(duty)
-
-    await ws_manager.broadcast_to_org(
-        org_id,
-        f"duty.{target_status.value.lower()}",
-        {"duty_id": str(duty.id), "duty_number": duty.duty_number, "status": target_status.value},
-    )
-
-    return DutyResponse.model_validate(duty)
+    async with conn.execute("SELECT * FROM duties WHERE id = ?", (duty_id,)) as cursor:
+        row = await cursor.fetchone()
+        return DutyResponse.model_validate(_row_to_response(dict(row), ctx.organisation_id))
 
 
 async def list_duties(
-    org_id: uuid.UUID,
-    db: AsyncSession,
+    ctx: TenantContext,
     status_filter: Optional[DutyStatus] = None,
     driver_id: Optional[uuid.UUID] = None,
     vehicle_id: Optional[uuid.UUID] = None,
     skip: int = 0,
     limit: int = 50,
 ) -> list[DutyResponse]:
-    stmt = select(Duty).where(Duty.organisation_id == org_id)
+    conn = await ctx.d1.get_connection()
+    
+    query = "SELECT * FROM duties WHERE 1=1"
+    params = []
+    
     if status_filter:
-        stmt = stmt.where(Duty.status == status_filter)
+        query += " AND status = ?"
+        params.append(status_filter.value)
     if driver_id:
-        stmt = stmt.where(Duty.driver_id == driver_id)
+        query += " AND driver_id = ?"
+        params.append(str(driver_id))
     if vehicle_id:
-        stmt = stmt.where(Duty.vehicle_id == vehicle_id)
-
-    stmt = stmt.order_by(desc(Duty.created_at)).offset(skip).limit(limit)
-    res = await db.execute(stmt)
-    rows = res.scalars().all()
-    return [DutyResponse.model_validate(r) for r in rows]
+        query += " AND vehicle_id = ?"
+        params.append(str(vehicle_id))
+        
+    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, skip])
+    
+    async with conn.execute(query, tuple(params)) as cursor:
+        rows = await cursor.fetchall()
+        return [DutyResponse.model_validate(_row_to_response(dict(r), ctx.organisation_id)) for r in rows]
 
 
 async def get_duty(
-    org_id: uuid.UUID,
+    ctx: TenantContext,
     duty_id: uuid.UUID,
-    db: AsyncSession,
 ) -> DutyResponse:
-    stmt = select(Duty).where(Duty.id == duty_id, Duty.organisation_id == org_id)
-    res = await db.execute(stmt)
-    duty = res.scalars().first()
-    if not duty:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
-    return DutyResponse.model_validate(duty)
+    conn = await ctx.d1.get_connection()
+    async with conn.execute("SELECT * FROM duties WHERE id = ?", (str(duty_id),)) as cursor:
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
+        return DutyResponse.model_validate(_row_to_response(dict(row), ctx.organisation_id))
+
+
+async def assign_duty(
+    ctx: TenantContext,
+    duty_id: uuid.UUID,
+    req: DutyAssignRequest,
+) -> DutyResponse:
+    conn = await ctx.d1.get_connection()
+    
+    async with conn.execute("SELECT * FROM duties WHERE id = ?", (str(duty_id),)) as cursor:
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
+        
+        duty_dict = dict(row)
+
+    if duty_dict.get("status") not in (DutyStatus.UNASSIGNED.value, DutyStatus.CANCELLED.value):
+        # We allow reassigning if they are just ASSIGNED, maybe. But if dispatched, block.
+        if duty_dict.get("status") not in (DutyStatus.ASSIGNED.value, DutyStatus.DRIVER_ACCEPTANCE_PENDING.value):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot assign driver to duty in status {duty_dict.get('status')}")
+            
+    # Verify driver and vehicle
+    async with conn.execute("SELECT id FROM drivers WHERE id = ?", (str(req.driver_id),)) as cursor:
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
+            
+    async with conn.execute("SELECT id FROM vehicles WHERE id = ?", (str(req.vehicle_id),)) as cursor:
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
+
+    new_status = DutyStatus.ASSIGNED.value
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    await conn.execute(
+        "UPDATE duties SET driver_id = ?, vehicle_id = ?, status = ?, updated_at = ? WHERE id = ?",
+        (str(req.driver_id), str(req.vehicle_id), new_status, now_str, str(duty_id))
+    )
+    
+    await _log_duty_event(conn, str(duty_id), str(ctx.user_id), "DUTY_ASSIGNED", duty_dict.get("status"), new_status)
+
+    await ws_manager.broadcast_to_org(
+        ctx.organisation_id,
+        "duty.assigned",
+        {"duty_id": str(duty_id), "duty_number": duty_dict.get("duty_number")},
+    )
+
+    async with conn.execute("SELECT * FROM duties WHERE id = ?", (str(duty_id),)) as cursor:
+        updated_row = await cursor.fetchone()
+        return DutyResponse.model_validate(_row_to_response(dict(updated_row), ctx.organisation_id))
+
+
+async def _update_duty_status(ctx: TenantContext, duty_id: uuid.UUID, target_status: DutyStatus, allowed_previous_states: list[str]) -> DutyResponse:
+    conn = await ctx.d1.get_connection()
+    async with conn.execute("SELECT * FROM duties WHERE id = ?", (str(duty_id),)) as cursor:
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
+        duty_dict = dict(row)
+        
+    current_status = duty_dict.get("status")
+    if current_status not in allowed_previous_states:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Invalid transition from {current_status} to {target_status.value}",
+        )
+        
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    await conn.execute(
+        "UPDATE duties SET status = ?, updated_at = ? WHERE id = ?",
+        (target_status.value, now_str, str(duty_id))
+    )
+    
+    await _log_duty_event(conn, str(duty_id), str(ctx.user_id), f"DUTY_{target_status.value}", current_status, target_status.value)
+    
+    await ws_manager.broadcast_to_org(
+        ctx.organisation_id,
+        f"duty.{target_status.value.lower()}",
+        {"duty_id": str(duty_id), "duty_number": duty_dict.get("duty_number")},
+    )
+
+    async with conn.execute("SELECT * FROM duties WHERE id = ?", (str(duty_id),)) as cursor:
+        updated_row = await cursor.fetchone()
+        return DutyResponse.model_validate(_row_to_response(dict(updated_row), ctx.organisation_id))
+
+
+async def dispatch_duty(ctx: TenantContext, duty_id: uuid.UUID) -> DutyResponse:
+    return await _update_duty_status(ctx, duty_id, DutyStatus.DISPATCHED, [DutyStatus.ASSIGNED.value, DutyStatus.ACCEPTED.value])
+
+async def driver_accept_duty(ctx: TenantContext, duty_id: uuid.UUID) -> DutyResponse:
+    return await _update_duty_status(ctx, duty_id, DutyStatus.ACCEPTED, [DutyStatus.ASSIGNED.value, DutyStatus.DRIVER_ACCEPTANCE_PENDING.value])
+
+async def update_duty_milestone(ctx: TenantContext, duty_id: uuid.UUID, target_status: DutyStatus) -> DutyResponse:
+    allowed = []
+    if target_status == DutyStatus.ARRIVED_PICKUP:
+        allowed = [DutyStatus.DISPATCHED.value]
+    elif target_status == DutyStatus.IN_TRANSIT:
+        allowed = [DutyStatus.ARRIVED_PICKUP.value]
+    elif target_status == DutyStatus.ARRIVED_DROP:
+        allowed = [DutyStatus.IN_TRANSIT.value]
+    elif target_status == DutyStatus.DUTY_COMPLETED:
+        allowed = [DutyStatus.ARRIVED_DROP.value]
+        
+    return await _update_duty_status(ctx, duty_id, target_status, allowed)
+
+async def driver_reject_duty(ctx: TenantContext, duty_id: uuid.UUID, reason: Optional[str]) -> DutyResponse:
+    # Actually just unassign it and put back to unassigned
+    conn = await ctx.d1.get_connection()
+    async with conn.execute("SELECT * FROM duties WHERE id = ?", (str(duty_id),)) as cursor:
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Duty not found")
+        duty_dict = dict(row)
+        
+    current_status = duty_dict.get("status")
+    if current_status not in (DutyStatus.ASSIGNED.value, DutyStatus.DRIVER_ACCEPTANCE_PENDING.value, DutyStatus.DISPATCHED.value):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot reject at this stage.")
+        
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    await conn.execute(
+        "UPDATE duties SET status = ?, driver_id = NULL, vehicle_id = NULL, updated_at = ? WHERE id = ?",
+        (DutyStatus.UNASSIGNED.value, now_str, str(duty_id))
+    )
+    
+    await _log_duty_event(conn, str(duty_id), str(ctx.user_id), "DUTY_REJECTED", current_status, DutyStatus.UNASSIGNED.value, f'{{"reason": "{reason}"}}')
+    
+    async with conn.execute("SELECT * FROM duties WHERE id = ?", (str(duty_id),)) as cursor:
+        updated_row = await cursor.fetchone()
+        return DutyResponse.model_validate(_row_to_response(dict(updated_row), ctx.organisation_id))

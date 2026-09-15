@@ -188,7 +188,7 @@ async def get_tenant_context(
         mongodb_database_name=row["mongo_db_name"],
         cloudinary_prefix=row["cloudinary_folder_prefix"] or f"zolexora/organisations/{user.organisation_id}/",
         r2_bucket=row["r2_bucket"] or "tms-documents",
-        r2_prefix=row["r2_prefix"] or f"organisations/{user.organisation_id}/"
+        r2_prefix=row["r2_prefix"], user_id=user.id or f"organisations/{user.organisation_id}/"
     )
 
 async def require_platform_admin(user: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:

@@ -2,6 +2,7 @@ import uuid
 from typing import Optional
 from dataclasses import dataclass
 from app.modules.platform.models import ProviderType
+from app.core.providers.database import D1TenantProvider
 
 @dataclass
 class TenantContext:
@@ -13,4 +14,8 @@ class TenantContext:
     cloudinary_prefix: Optional[str]
     r2_bucket: Optional[str]
     r2_prefix: Optional[str]
+    user_id: Optional[uuid.UUID] = None
 
+    @property
+    def d1(self) -> D1TenantProvider:
+        return D1TenantProvider(self.tenant_database_identifier)

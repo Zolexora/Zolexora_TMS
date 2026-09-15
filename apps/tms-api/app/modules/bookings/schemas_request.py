@@ -1,14 +1,9 @@
 import datetime
-from decimal import Decimal
 import uuid
+from decimal import Decimal
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, ConfigDict, Field
-from app.modules.bookings.models_request import (
-    BookingRequestStatus,
-    BookingServiceType,
-    BookingType,
-)
-
+from app.modules.bookings.enums import BookingRequestStatus, BookingServiceType, BookingType
 
 class BookingRequestBase(BaseModel):
     customer_id: uuid.UUID
@@ -27,28 +22,22 @@ class BookingRequestBase(BaseModel):
     vehicle_requirements: Dict[str, Any] = Field(default_factory=dict)
     special_instructions: Optional[str] = None
     source: str = Field(default="MANUAL")
+    rate_card_version_id: Optional[uuid.UUID] = None
     estimated_pricing: Optional[Decimal] = None
-
 
 class BookingRequestCreate(BookingRequestBase):
     pass
 
-
 class BookingRequestUpdate(BaseModel):
     pickup_address: Optional[str] = None
-    pickup_lat: Optional[float] = None
-    pickup_lng: Optional[float] = None
     drop_address: Optional[str] = None
-    drop_lat: Optional[float] = None
-    drop_lng: Optional[float] = None
     pickup_datetime: Optional[datetime.datetime] = None
     expected_completion_datetime: Optional[datetime.datetime] = None
     passenger_info: Optional[Dict[str, Any]] = None
     cargo_info: Optional[Dict[str, Any]] = None
     vehicle_requirements: Optional[Dict[str, Any]] = None
     special_instructions: Optional[str] = None
-    estimated_pricing: Optional[Decimal] = None
-
+    status: Optional[BookingRequestStatus] = None
 
 class BookingRequestResponse(BookingRequestBase):
     model_config = ConfigDict(from_attributes=True)
