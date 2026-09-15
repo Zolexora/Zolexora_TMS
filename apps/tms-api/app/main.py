@@ -82,6 +82,7 @@ from app.modules.vehicles.routes import router as vehicles_router
 from app.modules.bookings.routes_request import router as booking_requests_router
 from app.modules.bookings.routes import router as bookings_router
 from app.modules.duties.routes import router as duties_router
+from app.modules.customization.routes import router as customization_router
 # from app.modules.trips.routes import router as trips_router
 # from app.modules.dispatch.routes import router as dispatch_router
 from app.modules.billing.routes import router as billing_router
@@ -98,6 +99,7 @@ from app.modules.auth.routes import router as auth_router
 app.include_router(health_router)
 app.include_router(organisations_router)
 app.include_router(users_router)
+app.include_router(customization_router)
 # app.include_router(customers_router)
 # app.include_router(vendors_router)
 # app.include_router(drivers_router)

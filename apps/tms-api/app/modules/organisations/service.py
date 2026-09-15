@@ -116,6 +116,7 @@ async def complete_onboarding(
         status=OrganisationStatus.ACTIVE, # In a fully asynchronous flow this would be PROVISIONING
     )
     db.add(org)
+    await db.flush()
 
     # 4. Assign initial creator as Commander
     member = OrganisationMember(
@@ -156,7 +157,19 @@ async def complete_onboarding(
     )
     db.add(storage_assignment)
 
-    # 5. Audit Log Entry
+    # 5. Create Default Customization Definition
+    from app.modules.customization.models import OrganisationApplication, ApplicationType, ApplicationStatus
+    app_def = OrganisationApplication(
+        id=uuid.uuid4(),
+        organisation_id=org_id,
+        application_type=ApplicationType.STANDARD,
+        application_name=f"{req.name.strip()} TMS",
+        application_version="1.0.0",
+        status=ApplicationStatus.ACTIVE
+    )
+    db.add(app_def)
+
+    # 6. Audit Log Entry
     # (assuming platform_audit_logs handles itself or we add one later)
 
     # Atomically commit everything
