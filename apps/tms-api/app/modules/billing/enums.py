@@ -2,6 +2,8 @@ import enum
 
 class RateRuleType(str, enum.Enum):
     FIXED_TRIP = "FIXED_TRIP"
+    FIXED_MONTHLY = "FIXED_MONTHLY"
+    SLAB_KM = "SLAB_KM"
     PER_KM = "PER_KM"
     PER_HOUR = "PER_HOUR"
     MINIMUM_CHARGE = "MINIMUM_CHARGE"

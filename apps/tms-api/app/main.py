@@ -84,7 +84,7 @@ from app.modules.bookings.routes import router as bookings_router
 from app.modules.duties.routes import router as duties_router
 # from app.modules.trips.routes import router as trips_router
 # from app.modules.dispatch.routes import router as dispatch_router
-# from app.modules.billing.routes import router as billing_router
+from app.modules.billing.routes import router as billing_router
 # from app.modules.invoices.routes import router as invoices_router
 # from app.modules.invoices.adjustment_routes import router as adjustments_router
 # from app.modules.payables.routes import router as payables_router
@@ -107,7 +107,7 @@ app.include_router(bookings_router)
 app.include_router(duties_router)
 # app.include_router(trips_router)
 # app.include_router(dispatch_router)
-# app.include_router(billing_router)
+app.include_router(billing_router)
 # app.include_router(invoices_router)
 # app.include_router(adjustments_router)
 # app.include_router(payables_router)

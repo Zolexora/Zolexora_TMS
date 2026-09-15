@@ -104,16 +104,17 @@ export function App() {
               <Route path="/compliance/drivers" element={<DriversPage />} />
               <Route path="/compliance/customers" element={<CustomersPage />} />
               <Route path="/compliance/vendors" element={<VendorsPage />} />
-              <Route path="/rate-cards" element={<RateCardsPage />} />
+              <Route path="/rate-cards/customers" element={<RateCardsPage type="customer" />} />
+              <Route path="/rate-cards/vendors" element={<RateCardsPage type="vendor" />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/invoices" element={<InvoicesPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/payables" element={<PayablesPage />} />
-              <Route path="/expenses" element={<ExpensesPage />} />
-              <Route path="/receivables" element={<ReceivablesAgeingPage />} />
               <Route path="/vendor-settlements" element={<VendorSettlementsPage />} />
               <Route path="/vendor-payments" element={<VendorPaymentHistoryPage />} />
+              <Route path="/receivables" element={<ReceivablesAgeingPage />} />
               <Route path="/financial-periods" element={<FinancialPeriodsPage />} />
+              <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/reports/pnl" element={<PnLReportsPage />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/settings" element={<SettingsPage />} />

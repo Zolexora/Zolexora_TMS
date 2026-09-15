@@ -4,14 +4,15 @@ import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 
 interface RateCardFormProps {
   onClose: () => void;
+  defaultSide?: 'CUSTOMER' | 'VENDOR';
 }
 
-export function RateCardForm({ onClose }: RateCardFormProps) {
+export function RateCardForm({ onClose, defaultSide = 'CUSTOMER' }: RateCardFormProps) {
   const createMutation = useCreateRateCard();
   const [formError, setFormError] = useState('');
   
   const [name, setName] = useState('');
-  const [side, setSide] = useState<'CUSTOMER'|'VENDOR'>('CUSTOMER');
+  const [side, setSide] = useState<'CUSTOMER'|'VENDOR'>(defaultSide);
   const [serviceType,  ] = useState('ETS');
   
   const [rules, setRules] = useState<any[]>([

@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  (import.meta.env.DEV ? '' : 'https://api.tms.zolexora.onrender.com');
+  (import.meta.env.DEV ? '' : 'https://api.admin.tms.zolexora.onrender.com');
 
 export async function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();

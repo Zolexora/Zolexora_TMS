@@ -34,7 +34,6 @@ const navigation: { section: string; items: NavItem[] }[] = [
       { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
       { name: 'Duties', href: '/duties', icon: ClipboardList },
       { name: 'Dispatch Board', href: '/dispatch', icon: Radio },
-      { name: 'Rate Cards', href: '/rate-cards', icon: FileText },
     ],
   },
   {
@@ -51,6 +50,7 @@ const navigation: { section: string; items: NavItem[] }[] = [
     section: 'Billing',
     items: [
       { name: 'Billing', href: '/billing', icon: FileText },
+      { name: 'Customer Rate Cards', href: '/rate-cards/customers', icon: FileText },
       { name: 'Invoices', href: '/invoices', icon: FileText },
       { name: 'Customer Payments', href: '/payments', icon: CreditCard },
       { name: 'Receivables', href: '/receivables', icon: CreditCard },
@@ -59,6 +59,7 @@ const navigation: { section: string; items: NavItem[] }[] = [
   {
     section: 'Vendor Payments',
     items: [
+      { name: 'Vendor Rate Cards', href: '/rate-cards/vendors', icon: FileText },
       { name: 'Payables', href: '/payables', icon: Receipt },
       { name: 'Vendor Settlements', href: '/vendor-settlements', icon: Receipt },
       { name: 'Payment History', href: '/vendor-payments', icon: CreditCard },
