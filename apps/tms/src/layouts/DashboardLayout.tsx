@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../features/auth/useAuth';
+import { useApplicationRuntime } from '../providers/ApplicationRuntimeProvider';
 
 interface NavItem {
   name: string;
@@ -83,7 +84,26 @@ const navigation: { section: string; items: NavItem[] }[] = [
 
 export function DashboardLayout() {
   const { user, authMe, organisation, isCommander, signOut } = useAuth();
+  const runtime = useApplicationRuntime();
   const navigate = useNavigate();
+
+  const filteredNavigation = navigation.map(group => {
+    // Basic runtime module filtering
+    if (group.section === 'Operations') {
+      return {
+        ...group,
+        items: group.items.filter(item => {
+          if (item.name === 'Bookings' && !runtime.modules['bookings']?.enabled) return false;
+          if (item.name === 'Duties' && !runtime.modules['duties']?.enabled) return false;
+          return true;
+        })
+      };
+    }
+    if (group.section === 'Billing' && !runtime.modules['billing']?.enabled) {
+      return { ...group, items: [] };
+    }
+    return group;
+  }).filter(group => group.items.length > 0);
 
   const handleSignOut = async () => {
     await signOut();
@@ -100,7 +120,7 @@ export function DashboardLayout() {
             <Truck className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold tracking-tight text-white text-base">Zolexora TMS</span>
+            <span className="font-bold tracking-tight text-white text-base">{runtime.branding.application_name}</span>
             <span className="text-[10px] font-medium uppercase tracking-widest text-indigo-400">Transport Hub</span>
           </div>
         </div>
@@ -133,7 +153,7 @@ export function DashboardLayout() {
 
         {/* Navigation Sections */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-          {navigation.map((group) => (
+          {filteredNavigation.map((group) => (
             <div key={group.section} className="space-y-1">
               <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 {group.section}

@@ -17,7 +17,21 @@ from .models import (
     ApplicationApproval
 )
 
+from .schemas import RuntimeConfiguration
+from .service import ApplicationRuntimeService
+
 router = APIRouter(prefix="/api/v1/application", tags=["Application Configuration"])
+
+@router.get("/runtime", response_model=RuntimeConfiguration)
+async def get_application_runtime(
+    user: AuthenticatedUser = Depends(get_current_active_organisation),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get the complete, normalized runtime configuration for the current organisation's application.
+    This safely encapsulates modules, configuration, navigation, terminology, etc.
+    """
+    return await ApplicationRuntimeService.get_runtime_configuration(db, user.organisation_id)
 
 @router.get("")
 async def get_application_definition(

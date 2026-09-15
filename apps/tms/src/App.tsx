@@ -27,6 +27,7 @@ import { PnLReportsPage } from './features/reports/PnLReportsPage';
 import { SettingsPage } from './features/onboarding/SettingsPage';
 import { AuthCallback } from './features/auth/AuthCallback';
 import CompliancePage from './pages/compliance/CompliancePage';
+import { ApplicationRuntimeProvider } from './providers/ApplicationRuntimeProvider';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,7 +96,7 @@ export function App() {
 
           {/* Protected Workspace Navigation */}
           <Route element={<ProtectedRoute />}>
-            <Route element={<DashboardLayout />}>
+            <Route element={<ApplicationRuntimeProvider><DashboardLayout /></ApplicationRuntimeProvider>}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/bookings" element={<BookingsPage />} />
               <Route path="/duties" element={<DutiesPage />} />
