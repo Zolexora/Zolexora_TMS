@@ -35,3 +35,6 @@ __pycache__/
 
 # TypeScript
 *.tsbuildinfo
+
+# MongoDB VS Code Playgrounds
+mongodb/*.mongodb.js
