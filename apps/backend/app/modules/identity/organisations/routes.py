@@ -8,6 +8,7 @@ from app.auth.dependencies import (
 )
 from app.db.session import get_db
 from app.modules.identity.organisations.schemas import (
+    InvitationResponse,
     MemberInviteRequest,
     MemberResponse,
     OnboardingRequest,
@@ -62,7 +63,7 @@ async def get_members(
     return await list_organisation_members(org_id=user.organisation_id, db=db)
 
 
-@router.post("/organisations/members/invite", response_model=MemberResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/organisations/members/invite")
 async def invite_new_member(
     req: MemberInviteRequest,
     user: AuthenticatedUser = Depends(require_permission("users.manage")),

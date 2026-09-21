@@ -1,33 +1,41 @@
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-import uuid
-from typing import List, Optional
+import re
 
-from app.auth.dependencies import AuthenticatedUser, get_current_user
+filepath = "apps/backend/app/modules/identity/users/routes.py"
+with open(filepath, "r") as f:
+    content = f.read()
 
-router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
-
-
-class UserMeResponse(BaseModel):
+# Fix UserMeResponse
+old_model = """class UserMeResponse(BaseModel):
     id: uuid.UUID
     email: Optional[str]
     full_name: Optional[str]
     organisation_id: Optional[uuid.UUID]
-    is_creator: bool
+    role_code: Optional[str]
+    permissions: List[str]"""
+new_model = """class UserMeResponse(BaseModel):
+    id: uuid.UUID
+    email: Optional[str]
+    full_name: Optional[str]
+    organisation_id: Optional[uuid.UUID]
+    is_creator: bool"""
+content = content.replace(old_model, new_model)
 
-
-@router.get("/me", response_model=UserMeResponse)
-async def get_current_user_profile(
-    user: AuthenticatedUser = Depends(get_current_user),
-):
-    return UserMeResponse(
-        id=user.id,
+# Fix endpoint mapping
+old_mapping = """        id=user.id,
         email=user.email,
         full_name=user.full_name,
         organisation_id=user.organisation_id,
-        is_creator=user.is_creator,
-    )
+        role_code=user.role_code,
+        permissions=user.permissions,"""
+new_mapping = """        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        organisation_id=user.organisation_id,
+        is_creator=user.is_creator,"""
+content = content.replace(old_mapping, new_mapping)
 
+# Add memberships endpoint
+additional_endpoint = """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
@@ -61,3 +69,8 @@ async def get_my_organisations(
             is_creator=member.is_creator
         ) for org, member in rows
     ]
+"""
+content += additional_endpoint
+
+with open(filepath, "w") as f:
+    f.write(content)

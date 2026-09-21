@@ -98,14 +98,9 @@ async def get_current_active_organisation(
         query = text("""
             SELECT 
                 m.organisation_id,
-                r.code as role_code,
-                array_agg(perm.code) FILTER (WHERE perm.code IS NOT NULL) as permissions
+                m.is_creator
             FROM public.organisation_members m
-            JOIN public.roles r ON r.id = m.role_id
-            LEFT JOIN public.role_permissions rp ON rp.role_id = r.id
-            LEFT JOIN public.permissions perm ON perm.id = rp.permission_id
             WHERE m.user_id = :user_id AND m.organisation_id = :org_id AND m.status = 'ACTIVE'
-            GROUP BY m.organisation_id, r.code
         """)
         result = await db.execute(query, {"user_id": identity.id, "org_id": requested_org_id})
         row = result.mappings().first()
@@ -120,14 +115,9 @@ async def get_current_active_organisation(
         query = text("""
             SELECT 
                 m.organisation_id,
-                r.code as role_code,
-                array_agg(perm.code) FILTER (WHERE perm.code IS NOT NULL) as permissions
+                m.is_creator
             FROM public.organisation_members m
-            JOIN public.roles r ON r.id = m.role_id
-            LEFT JOIN public.role_permissions rp ON rp.role_id = r.id
-            LEFT JOIN public.permissions perm ON perm.id = rp.permission_id
             WHERE m.user_id = :user_id AND m.status = 'ACTIVE'
-            GROUP BY m.organisation_id, r.code
             ORDER BY m.created_at ASC
             LIMIT 1
         """)
@@ -145,8 +135,7 @@ async def get_current_active_organisation(
         email=identity.email,
         full_name=identity.full_name,
         organisation_id=row["organisation_id"],
-        role_code=row["role_code"],
-        permissions=list(row["permissions"]) if row["permissions"] else [],
+        is_creator=row["is_creator"],
     )
 
 async def get_current_user(user: AuthenticatedUser = Depends(get_current_active_organisation)) -> AuthenticatedUser:
@@ -164,10 +153,10 @@ def require_permission(permission: str) -> Callable:
     return dependency
 
 async def require_commander(user: AuthenticatedUser = Depends(get_current_active_organisation)) -> AuthenticatedUser:
-    if user.role_code != "COMMANDER":
+    if not user.is_creator:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the Organisation Commander can perform this action",
+            detail="Only the Organisation Creator (Commander) can perform this action",
         )
     return user
 
@@ -213,8 +202,8 @@ async def get_tenant_context(
         r2_bucket=row["r2_bucket"] or "tms-documents",
         r2_prefix=row["r2_prefix"],
         user_id=user.id,
-        role_code=user.role_code,
-        permissions=user.permissions
+        role_code="CREATOR" if user.is_creator else "MEMBER",
+        permissions=[]
     )
 
 async def require_platform_admin(identity: AuthenticatedIdentity = Depends(get_current_identity), db: AsyncSession = Depends(get_db)) -> AuthenticatedIdentity:

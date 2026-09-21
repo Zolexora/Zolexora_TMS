@@ -7,7 +7,7 @@ from app.modules.crm.vendors.models import VendorType, VendorStatus
 
 class VendorBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=160)
-    vendor_type: VendorType = Field(default=VendorType.FLEET_SUPPLIER)
+    vendor_type: VendorType = Field(default=VendorType.TRANSPORTER)
     contact_person: Optional[str] = Field(None, max_length=120)
     email: Optional[str] = Field(None, max_length=160)
     phone: Optional[str] = Field(None, max_length=32)

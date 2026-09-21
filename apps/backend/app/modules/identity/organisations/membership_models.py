@@ -1,6 +1,7 @@
 import enum
 import uuid
-from sqlalchemy import Enum, ForeignKey, UniqueConstraint
+import datetime
+from sqlalchemy import Enum, ForeignKey, UniqueConstraint, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
@@ -24,16 +25,24 @@ class OrganisationMember(Base, TimestampMixin):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, index=True
     )
-    role_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False
-    )
     status: Mapped[MemberStatus] = mapped_column(
         Enum(MemberStatus, name="member_status"), default=MemberStatus.ACTIVE, nullable=False
     )
+    is_creator: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     organisation: Mapped["Organisation"] = relationship("Organisation")
-    role: Mapped["Role"] = relationship("app.modules.identity.roles.models.Role", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("organisation_id", "user_id", name="uq_org_member_org_user"),
     )
+
+class OrganisationInvitation(Base, TimestampMixin):
+    __tablename__ = "organisation_invitations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organisation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
+    email: Mapped[str] = mapped_column(nullable=False, index=True)
+    token: Mapped[str] = mapped_column(nullable=False, unique=True, index=True)
+    status: Mapped[str] = mapped_column(default="PENDING", nullable=False) # PENDING, ACCEPTED, REVOKED, EXPIRED
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
