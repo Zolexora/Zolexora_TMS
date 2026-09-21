@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@11.24.0",
   "scripts": {
+    "local:start": "bash scripts/local-start.sh",
     "docker:start": "bash scripts/docker-start.sh start",
     "docker:stop": "bash scripts/docker-start.sh stop",
     "build:tms": "pnpm --filter zolexora-tms run build",
