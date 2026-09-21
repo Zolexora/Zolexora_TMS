@@ -95,6 +95,7 @@ from app.modules.billing.routes import router as billing_router
 # from app.modules.compliance.routes import router as compliance_router
 from app.modules.platform.routes import router as platform_router
 from app.modules.auth.routes import router as auth_router
+from app.modules.extensions.r1rcm.routes import router as r1rcm_router
 
 app.include_router(health_router)
 app.include_router(organisations_router)
@@ -119,3 +120,4 @@ app.include_router(billing_router)
 # app.include_router(compliance_router)
 app.include_router(platform_router)
 app.include_router(auth_router)
+app.include_router(r1rcm_router)

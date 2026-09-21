@@ -8,7 +8,7 @@
     "build:admin": "pnpm --filter admin run build",
     "dev:tms": "pnpm --filter tms run dev",
     "dev:admin": "pnpm --filter admin run dev",
-    "test:backend": "apps/tms-api/.venv/bin/pytest apps/tms-api/tests/",
+    "test:backend": "backend/.venv/bin/pytest backend/tests/",
     "cli:check": "bash scripts/setup-cli-ecosystem.sh --check",
     "cli:setup": "bash scripts/setup-cli-ecosystem.sh",
     "cli:docs": "bash scripts/setup-cli-ecosystem.sh --docs",

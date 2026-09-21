@@ -45,6 +45,7 @@ class ApplicationModule(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id = Column(UUID(as_uuid=True), ForeignKey("organisation_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     module_code = Column(String, nullable=False)
     is_enabled = Column(Boolean, nullable=False, default=True)
     
@@ -56,6 +57,7 @@ class ApplicationConfiguration(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id = Column(UUID(as_uuid=True), ForeignKey("organisation_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     config_type = Column(Enum(ConfigType), nullable=False)
     config_data = Column(JSONB, nullable=False, default={})
     
@@ -67,6 +69,7 @@ class ApplicationWorkflow(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id = Column(UUID(as_uuid=True), ForeignKey("organisation_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     entity_type = Column(String, nullable=False)
     workflow_name = Column(String, nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
@@ -80,6 +83,7 @@ class ApplicationRule(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id = Column(UUID(as_uuid=True), ForeignKey("organisation_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     entity_type = Column(String, nullable=False)
     rule_name = Column(String, nullable=False)
     conditions_json = Column(JSONB, nullable=False, default={})
@@ -95,6 +99,7 @@ class ApplicationForm(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id = Column(UUID(as_uuid=True), ForeignKey("organisation_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     entity_type = Column(String, nullable=False)
     form_name = Column(String, nullable=False)
     fields_config_json = Column(JSONB, nullable=False, default={})
@@ -109,6 +114,7 @@ class ApplicationReport(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id = Column(UUID(as_uuid=True), ForeignKey("organisation_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     report_name = Column(String, nullable=False)
     entity_source = Column(String, nullable=False)
     report_definition_json = Column(JSONB, nullable=False, default={})
@@ -121,6 +127,7 @@ class ApplicationApproval(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     application_id = Column(UUID(as_uuid=True), ForeignKey("organisation_applications.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     entity_type = Column(String, nullable=False)
     approval_chain_json = Column(JSONB, nullable=False, default={})
     

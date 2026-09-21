@@ -7,7 +7,7 @@ modules = [
     "payments", "vendors"
 ]
 
-base_dir = "apps/tms-api/app/modules"
+base_dir = "backend/app/modules"
 
 for mod in modules:
     model_path = os.path.join(base_dir, mod, "models.py")

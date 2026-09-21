@@ -1,7 +1,7 @@
 [project]
-name = "zolexora-tms-api"
+name = "zolexora-backend"
 version = "0.1.0"
-description = "Zolexora TMS Production API Service"
+description = "Zolexora Backend Service"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -9,6 +9,7 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2.8.0",
     "pydantic-settings>=2.4.0",
+    "pydantic[email]",
     "sqlalchemy>=2.0.32",
     "asyncpg>=0.29.0",
     "psycopg2-binary>=2.9.9",
@@ -25,6 +26,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "reportlab>=5.0.1",
     "aiosqlite>=0.20.0",
+    "supabase>=2.0.0",
 ]
 
 [dependency-groups]
