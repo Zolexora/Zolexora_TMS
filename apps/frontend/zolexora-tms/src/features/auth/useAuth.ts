@@ -66,7 +66,7 @@ export function useAuth() {
     queryClient.clear();
   };
 
-  const isCommander = authMe?.role_code === 'COMMANDER';
+  const isCommander = authMe?.is_commander === true;
 
   return {
     session,

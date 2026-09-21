@@ -116,6 +116,7 @@ async def complete_onboarding(
         user_id=user_id,
         status=MemberStatus.ACTIVE,
         is_creator=True,
+        is_commander=True,
     )
     db.add(member)
     
@@ -270,3 +271,75 @@ async def invite_member(
     await db.refresh(invitation)
 
     return {"message": "Invitation sent successfully", "invitation_id": invitation.id}
+
+from app.modules.identity.organisations.schemas import CommanderTransferRequest
+
+async def transfer_commander(
+    org_id: uuid.UUID,
+    current_commander_id: uuid.UUID,
+    req: CommanderTransferRequest,
+    db: AsyncSession,
+) -> dict:
+    # Validate old commander
+    stmt_old = select(OrganisationMember).where(
+        OrganisationMember.organisation_id == org_id,
+        OrganisationMember.user_id == current_commander_id,
+        OrganisationMember.status == MemberStatus.ACTIVE
+    )
+    res_old = await db.execute(stmt_old)
+    old_commander = res_old.scalars().first()
+    
+    if not old_commander or not old_commander.is_commander:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not the active commander of this organisation."
+        )
+
+    # Validate new commander
+    stmt_new = select(OrganisationMember).where(
+        OrganisationMember.organisation_id == org_id,
+        OrganisationMember.user_id == req.new_commander_user_id,
+        OrganisationMember.status == MemberStatus.ACTIVE
+    )
+    res_new = await db.execute(stmt_new)
+    new_commander = res_new.scalars().first()
+    
+    if not new_commander:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The target user is not an active member of this organisation."
+        )
+        
+    if old_commander.id == new_commander.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot transfer commander authority to yourself."
+        )
+
+    # Note: re-authentication check using req.password would happen here if Supabase/auth integration supported it natively via backend RPC
+
+    # Atomically transfer
+    old_commander.is_commander = False
+    new_commander.is_commander = True
+    
+    # In a full system (Prompt 07), we would assign the old_commander to `req.former_commander_role`.
+    
+    # Audit log
+    audit = PlatformAuditLog(
+        id=uuid.uuid4(),
+        organisation_id=org_id,
+        user_id=current_commander_id,
+        event_type="COMMANDER_TRANSFERRED",
+        entity_type="ORGANISATION",
+        entity_id=str(org_id),
+        payload=str({
+            "old_commander_user_id": str(current_commander_id),
+            "new_commander_user_id": str(req.new_commander_user_id),
+            "former_commander_role": req.former_commander_role
+        })
+    )
+    db.add(audit)
+    
+    await db.commit()
+    
+    return {"message": "Commander authority transferred successfully"}

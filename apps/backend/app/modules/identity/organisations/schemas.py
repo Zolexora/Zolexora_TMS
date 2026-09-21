@@ -44,6 +44,7 @@ class MemberResponse(BaseModel):
     user_id: uuid.UUID
     status: MemberStatus
     is_creator: bool
+    is_commander: bool
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -57,3 +58,8 @@ class InvitationResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class CommanderTransferRequest(BaseModel):
+    new_commander_user_id: uuid.UUID
+    former_commander_role: str = Field(..., description="Role code assigned to the former commander after transfer")
+    password: Optional[str] = Field(None, description="Current password for re-authentication confirmation if applicable")

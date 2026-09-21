@@ -13,6 +13,8 @@ export interface AuthMeResponse {
   organisation_id: string | null;
   role_code: string | null;
   permissions: string[];
+  is_creator: boolean;
+  is_commander: boolean;
 }
 
 export interface OrganisationMember {

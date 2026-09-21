@@ -1,7 +1,7 @@
 import enum
 import uuid
 import datetime
-from sqlalchemy import Enum, ForeignKey, UniqueConstraint, DateTime
+from sqlalchemy import Enum, ForeignKey, UniqueConstraint, DateTime, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
@@ -29,11 +29,14 @@ class OrganisationMember(Base, TimestampMixin):
         Enum(MemberStatus, name="member_status"), default=MemberStatus.ACTIVE, nullable=False
     )
     is_creator: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_commander: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     organisation: Mapped["Organisation"] = relationship("Organisation")
 
     __table_args__ = (
         UniqueConstraint("organisation_id", "user_id", name="uq_org_member_org_user"),
+        Index("uq_org_member_commander", "organisation_id", unique=True, postgresql_where=text("is_commander = true")),
+
     )
 
 class OrganisationInvitation(Base, TimestampMixin):

@@ -20,7 +20,11 @@ class AuthenticatedIdentity(BaseModel):
 
 class AuthenticatedUser(AuthenticatedIdentity):
     organisation_id: uuid.UUID
-    role_code: str
+    is_creator: bool = False
+    is_commander: bool = False
+    
+    # We will implement actual role systems in Prompt 07. For now, stub permissions.
+    role_code: Optional[str] = None
     permissions: List[str] = []
 
     @property
@@ -28,7 +32,7 @@ class AuthenticatedUser(AuthenticatedIdentity):
         return self.id
 
     def has_permission(self, permission: str) -> bool:
-        if self.role_code == "COMMANDER":
+        if self.is_commander:
             return True
         return permission in self.permissions
 
@@ -98,7 +102,8 @@ async def get_current_active_organisation(
         query = text("""
             SELECT 
                 m.organisation_id,
-                m.is_creator
+                m.is_creator,
+                m.is_commander
             FROM public.organisation_members m
             WHERE m.user_id = :user_id AND m.organisation_id = :org_id AND m.status = 'ACTIVE'
         """)
@@ -115,7 +120,8 @@ async def get_current_active_organisation(
         query = text("""
             SELECT 
                 m.organisation_id,
-                m.is_creator
+                m.is_creator,
+                m.is_commander
             FROM public.organisation_members m
             WHERE m.user_id = :user_id AND m.status = 'ACTIVE'
             ORDER BY m.created_at ASC
@@ -136,6 +142,7 @@ async def get_current_active_organisation(
         full_name=identity.full_name,
         organisation_id=row["organisation_id"],
         is_creator=row["is_creator"],
+        is_commander=row["is_commander"],
     )
 
 async def get_current_user(user: AuthenticatedUser = Depends(get_current_active_organisation)) -> AuthenticatedUser:
