@@ -11,15 +11,15 @@ COPY apps/frontend/tms ./apps/frontend/tms
 COPY apps/frontend/admin ./apps/frontend/admin
 
 # Install dependencies (only for frontends)
-RUN pnpm install --filter zolexora-tms --filter zolexora-admin
+RUN pnpm install --filter tms --filter admin
 
 # Build TMS
 FROM builder AS build-tms
-RUN pnpm --filter zolexora-tms run build
+RUN pnpm --filter tms run build
 
 # Build Admin
 FROM builder AS build-admin
-RUN pnpm --filter zolexora-admin run build
+RUN pnpm --filter admin run build
 
 # Serve TMS
 FROM nginx:alpine AS tms
