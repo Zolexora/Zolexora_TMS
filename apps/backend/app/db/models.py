@@ -22,6 +22,8 @@ from app.modules.core.customization.models import (
     ApplicationStatus,
     ConfigType,
     ApplicationModule,
+    ApplicationPage,
+    ApplicationAction,
     ApplicationConfiguration,
     ApplicationWorkflow,
     ApplicationRule,
@@ -62,6 +64,8 @@ __all__ = [
     "ApplicationStatus",
     "ConfigType",
     "ApplicationModule",
+    "ApplicationPage",
+    "ApplicationAction",
     "ApplicationConfiguration",
     "ApplicationWorkflow",
     "ApplicationRule",
@@ -72,3 +76,16 @@ __all__ = [
     "OperatingUnitLocation",
     "OperatingUnitStatus"
 ]
+
+from app.modules.crm.clients.models import Client, ClientLocation, ClientLocationOUHistory, ClientStatus
+from app.modules.crm.vendors.models import Vendor, VendorStatus, VendorType
+
+__all__.extend([
+    "Client",
+    "ClientLocation",
+    "ClientLocationOUHistory",
+    "ClientStatus",
+    "Vendor",
+    "VendorStatus",
+    "VendorType"
+])

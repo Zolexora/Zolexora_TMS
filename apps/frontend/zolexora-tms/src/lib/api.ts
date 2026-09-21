@@ -12,6 +12,12 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
   if (session?.access_token) {
     headers.set('Authorization', `Bearer ${session.access_token}`);
   }
+  
+  // Inject explicit tenant context for the backend
+  const activeOrgId = localStorage.getItem('zolexora_active_org_id');
+  if (activeOrgId) {
+    headers.set('X-Organization-Id', activeOrgId);
+  }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,

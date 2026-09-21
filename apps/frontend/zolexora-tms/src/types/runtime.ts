@@ -14,8 +14,21 @@ export interface RuntimeBranding {
   theme: Record<string, any>;
 }
 
-export interface RuntimeModule {
+export interface RuntimeAction {
+  name: string;
   enabled: boolean;
+}
+
+export interface RuntimePage {
+  name: string;
+  enabled: boolean;
+  actions: Record<string, RuntimeAction>;
+}
+
+export interface RuntimeModule {
+  name: string;
+  enabled: boolean;
+  pages: Record<string, RuntimePage>;
 }
 
 export interface RuntimeConfiguration {

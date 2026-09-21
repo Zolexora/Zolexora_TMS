@@ -15,8 +15,19 @@ class RuntimeBranding(BaseModel):
     logo_url: Optional[str] = None
     theme: Dict[str, Any] = {}
 
-class RuntimeModule(BaseModel):
+class RuntimeAction(BaseModel):
+    name: str
     enabled: bool
+
+class RuntimePage(BaseModel):
+    name: str
+    enabled: bool
+    actions: Dict[str, RuntimeAction] = {}
+
+class RuntimeModule(BaseModel):
+    name: str
+    enabled: bool
+    pages: Dict[str, RuntimePage] = {}
 
 class RuntimeForm(BaseModel):
     form_name: str

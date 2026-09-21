@@ -41,6 +41,15 @@ export function useAuth() {
     enabled: !!session?.access_token,
   });
 
+  // Keep localStorage in sync with the active org from the backend auth response
+  useEffect(() => {
+    if (authMe?.organisation_id) {
+      localStorage.setItem('zolexora_active_org_id', authMe.organisation_id);
+    } else if (!isAuthMeLoading && !authMe) {
+      localStorage.removeItem('zolexora_active_org_id');
+    }
+  }, [authMe?.organisation_id, isAuthMeLoading, authMe]);
+
   const {
     data: organisation,
     isLoading: isOrgLoading,
@@ -52,6 +61,7 @@ export function useAuth() {
   });
 
   const signOut = async () => {
+    localStorage.removeItem('zolexora_active_org_id');
     await supabase.auth.signOut();
     queryClient.clear();
   };
