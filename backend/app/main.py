@@ -75,24 +75,12 @@ from app.db import models as _db_models  # noqa: F401
 # Mount Routers
 from app.modules.organisations.routes import router as organisations_router
 from app.modules.users.routes import router as users_router
-# from app.modules.customers.routes import router as customers_router
-# from app.modules.vendors.routes import router as vendors_router
-# from app.modules.drivers.routes import router as drivers_router
 from app.modules.vehicles.routes import router as vehicles_router
 from app.modules.bookings.routes_request import router as booking_requests_router
 from app.modules.bookings.routes import router as bookings_router
 from app.modules.duties.routes import router as duties_router
 from app.modules.customization.routes import router as customization_router
-# from app.modules.trips.routes import router as trips_router
-# from app.modules.dispatch.routes import router as dispatch_router
 from app.modules.billing.routes import router as billing_router
-# from app.modules.invoices.routes import router as invoices_router
-# from app.modules.invoices.adjustment_routes import router as adjustments_router
-# from app.modules.payables.routes import router as payables_router
-# from app.modules.payments.routes import router as payments_router
-# from app.modules.expenses.routes import router as expenses_router
-# from app.modules.pl.routes import router as pl_router
-# from app.modules.compliance.routes import router as compliance_router
 from app.modules.platform.routes import router as platform_router
 from app.modules.auth.routes import router as auth_router
 from app.modules.extensions.r1rcm.routes import router as r1rcm_router
@@ -101,23 +89,11 @@ app.include_router(health_router)
 app.include_router(organisations_router)
 app.include_router(users_router)
 app.include_router(customization_router)
-# app.include_router(customers_router)
-# app.include_router(vendors_router)
-# app.include_router(drivers_router)
 app.include_router(vehicles_router)
 app.include_router(booking_requests_router)
 app.include_router(bookings_router)
 app.include_router(duties_router)
-# app.include_router(trips_router)
-# app.include_router(dispatch_router)
 app.include_router(billing_router)
-# app.include_router(invoices_router)
-# app.include_router(adjustments_router)
-# app.include_router(payables_router)
-# app.include_router(payments_router)
-# app.include_router(expenses_router)
-# app.include_router(pl_router)
-# app.include_router(compliance_router)
 app.include_router(platform_router)
 app.include_router(auth_router)
 app.include_router(r1rcm_router)
