@@ -1,6 +1,6 @@
 import enum
 import uuid
-from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Enum, ForeignKey, ForeignKeyConstraint, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
@@ -37,6 +37,7 @@ class OperatingUnit(Base, TimestampMixin):
 
     __table_args__ = (
         UniqueConstraint("organisation_id", "code", name="uq_org_ou_code"),
+        UniqueConstraint("id", "organisation_id", name="uq_ou_id_organisation_id"),
     )
 
 class OperatingUnitLocation(Base, TimestampMixin):
@@ -45,8 +46,11 @@ class OperatingUnitLocation(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    organisation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     operating_unit_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("operating_units.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True), nullable=False, index=True
     )
     code: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
@@ -77,4 +81,10 @@ class OperatingUnitLocation(Base, TimestampMixin):
 
     __table_args__ = (
         UniqueConstraint("operating_unit_id", "code", name="uq_ou_location_code"),
+        ForeignKeyConstraint(
+            ["operating_unit_id", "organisation_id"],
+            ["operating_units.id", "operating_units.organisation_id"],
+            ondelete="CASCADE",
+            name="fk_ou_location_ou_org"
+        ),
     )

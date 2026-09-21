@@ -28,13 +28,13 @@ export function CustomersPage() {
     queryKey: ['customers', search],
     queryFn: () => {
       const q = search ? `?search=${encodeURIComponent(search)}` : '';
-      return apiClient<Customer[]>(`/api/v1/customers${q}`);
+      return apiClient<Customer[]>(`/api/v1/crm/clients${q}`);
     },
   });
 
   const createMutation = useMutation({
     mutationFn: (data: CustomerCreate) =>
-      apiClient<Customer>('/api/v1/customers', {
+      apiClient<Customer>('/api/v1/crm/clients', {
         method: 'POST',
         body: JSON.stringify(data),
       }),

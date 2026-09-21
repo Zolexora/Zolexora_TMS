@@ -25,6 +25,7 @@ import { VendorSettlementsPage } from './features/billing/VendorSettlementsPage'
 import { FinancialPeriodsPage } from './features/reports/FinancialPeriodsPage';
 import { PnLReportsPage } from './features/reports/PnLReportsPage';
 import { SettingsPage } from './features/onboarding/SettingsPage';
+import { OperatingUnitsPage } from './features/operations/OperatingUnitsPage';
 import { R1TikriOperationsPage } from './features/extensions/r1rcm/R1TikriOperationsPage';
 import { AuthCallback } from './features/auth/AuthCallback';
 import CompliancePage from './pages/compliance/CompliancePage';
@@ -102,6 +103,7 @@ export function App() {
               <Route path="/bookings" element={<BookingsPage />} />
               <Route path="/duties" element={<DutiesPage />} />
               <Route path="/dispatch" element={<DispatchPage />} />
+              <Route path="/settings/operating-units" element={<OperatingUnitsPage />} />
               <Route path="/compliance/vehicles" element={<VehiclesPage />} />
               <Route path="/compliance/drivers" element={<DriversPage />} />
               <Route path="/compliance/customers" element={<CustomersPage />} />

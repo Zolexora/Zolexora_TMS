@@ -27,13 +27,13 @@ export function VendorsPage() {
     queryKey: ['vendors', search],
     queryFn: () => {
       const q = search ? `?search=${encodeURIComponent(search)}` : '';
-      return apiClient<Vendor[]>(`/api/v1/vendors${q}`);
+      return apiClient<Vendor[]>(`/api/v1/crm/vendors${q}`);
     },
   });
 
   const createMutation = useMutation({
     mutationFn: (data: VendorCreate) =>
-      apiClient<Vendor>('/api/v1/vendors', {
+      apiClient<Vendor>('/api/v1/crm/vendors', {
         method: 'POST',
         body: JSON.stringify(data),
       }),

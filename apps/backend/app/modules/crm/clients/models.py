@@ -40,7 +40,7 @@ class ClientLocation(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     organisation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
     client_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
-    operating_unit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("operating_units.id", ondelete="SET NULL"), nullable=True, index=True)
+    operating_unit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     address: Mapped[str | None] = mapped_column(String, nullable=True)
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -58,15 +58,69 @@ class ClientLocation(Base, TimestampMixin):
             name="fk_client_location_client_org",
             ondelete="CASCADE",
         ),
+        ForeignKeyConstraint(
+            ["operating_unit_id", "organisation_id"],
+            ["operating_units.id", "operating_units.organisation_id"],
+            name="fk_client_location_ou_org",
+            ondelete="SET NULL",
+        ),
         UniqueConstraint("id", "organisation_id", name="uq_client_location_id_organisation_id"),
+    )
+
+class ClientOperatingUnit(Base, TimestampMixin):
+    __tablename__ = "client_operating_units"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organisation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    operating_unit_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="ACTIVE", nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("client_id", "operating_unit_id", name="uq_client_ou"),
+        ForeignKeyConstraint(
+            ["client_id", "organisation_id"],
+            ["clients.id", "clients.organisation_id"],
+            name="fk_client_ou_client_org",
+            ondelete="CASCADE",
+        ),
+        # Assuming operating_units has unique constraint on id and organisation_id (added just now)
+        ForeignKeyConstraint(
+            ["operating_unit_id", "organisation_id"],
+            ["operating_units.id", "operating_units.organisation_id"],
+            name="fk_client_ou_ou_org",
+            ondelete="CASCADE",
+        ),
     )
 
 class ClientLocationOUHistory(Base, TimestampMixin):
     __tablename__ = "client_location_ou_history"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    client_location_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("client_locations.id", ondelete="CASCADE"), nullable=False, index=True)
-    previous_operating_unit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("operating_units.id", ondelete="SET NULL"), nullable=True)
-    new_operating_unit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("operating_units.id", ondelete="SET NULL"), nullable=True)
+    organisation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_location_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    previous_operating_unit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    new_operating_unit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     actor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     reason: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["client_location_id", "organisation_id"],
+            ["client_locations.id", "client_locations.organisation_id"],
+            name="fk_history_client_location_org",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["previous_operating_unit_id", "organisation_id"],
+            ["operating_units.id", "operating_units.organisation_id"],
+            name="fk_history_prev_ou_org",
+            ondelete="SET NULL",
+        ),
+        ForeignKeyConstraint(
+            ["new_operating_unit_id", "organisation_id"],
+            ["operating_units.id", "operating_units.organisation_id"],
+            name="fk_history_new_ou_org",
+            ondelete="SET NULL",
+        ),
+    )
