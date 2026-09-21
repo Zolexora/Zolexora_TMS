@@ -30,6 +30,12 @@ from app.modules.core.customization.models import (
     ApplicationApproval
 )
 
+from app.modules.operations.operating_units.models import (
+    OperatingUnit,
+    OperatingUnitLocation,
+    OperatingUnitStatus
+)
+
 __all__ = [
     "Base",
     "TenantDatabaseRegistry",
@@ -61,5 +67,8 @@ __all__ = [
     "ApplicationRule",
     "ApplicationForm",
     "ApplicationReport",
-    "ApplicationApproval"
+    "ApplicationApproval",
+    "OperatingUnit",
+    "OperatingUnitLocation",
+    "OperatingUnitStatus"
 ]
