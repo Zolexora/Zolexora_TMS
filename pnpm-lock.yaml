@@ -12,7 +12,7 @@ importers:
         specifier: ^2.116.0
         version: 2.116.0
 
-  apps/admin:
+  apps/frontend/admin:
     dependencies:
       '@supabase/supabase-js':
         specifier: ^2.48.1
@@ -70,7 +70,7 @@ importers:
         specifier: ^6.1.0
         version: 6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)
 
-  apps/tms:
+  apps/frontend/tms:
     dependencies:
       '@hookform/resolvers':
         specifier: ^3.9.1
