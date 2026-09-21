@@ -7,23 +7,23 @@ RUN corepack enable pnpm
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 
 # Copy frontends
-COPY apps/frontend/tms ./apps/frontend/tms
-COPY apps/frontend/admin ./apps/frontend/admin
+COPY apps/frontend/zolexora-tms ./apps/frontend/zolexora-tms
+COPY apps/frontend/tms-admin ./apps/frontend/tms-admin
 
 # Install dependencies (only for frontends)
-RUN pnpm install --filter tms --filter admin
+RUN pnpm install --filter zolexora-tms --filter zolexora-tms-admin
 
 # Build TMS
 FROM builder AS build-tms
-RUN pnpm --filter tms run build
+RUN pnpm --filter zolexora-tms run build
 
 # Build Admin
 FROM builder AS build-admin
-RUN pnpm --filter admin run build
+RUN pnpm --filter zolexora-tms-admin run build
 
 # Serve TMS
 FROM nginx:alpine AS tms
-COPY --from=build-tms /app/apps/frontend/tms/dist /usr/share/nginx/html
+COPY --from=build-tms /app/apps/frontend/zolexora-tms/dist /usr/share/nginx/html
 # SPA routing fallback for nginx
 RUN echo 'server { \
     listen 80; \
@@ -38,7 +38,7 @@ CMD ["nginx", "-g", "daemon off;"]
 
 # Serve Admin
 FROM nginx:alpine AS admin
-COPY --from=build-admin /app/apps/frontend/admin/dist /usr/share/nginx/html
+COPY --from=build-admin /app/apps/frontend/tms-admin/dist /usr/share/nginx/html
 # SPA routing fallback for nginx
 RUN echo 'server { \
     listen 80; \
