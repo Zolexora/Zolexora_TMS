@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.organisations.models import Organisation, OrganisationStatus
 from app.modules.identity.organisations.membership_models import OrganisationMember, MemberStatus
-from app.modules.identity.roles.models import Role
 from app.modules.identity.organisations.schemas import (
     MemberInviteRequest,
     MemberResponse,

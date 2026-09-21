@@ -20,6 +20,7 @@
     "ecosystem:docs": "bash scripts/setup-cli-ecosystem.sh --docs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.116.0"
+    "@supabase/supabase-js": "^2.116.0",
+    "sonner": "^2.0.8"
   }
 }

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { apiClient } from '../../lib/api';
-import type { AuthMeResponse, Organisation } from '../../types';
+import type { AuthMeResponse, Organisation, EffectivePermissionsResponse } from '../../types';
 
 export function useAuth() {
   const queryClient = useQueryClient();
@@ -26,6 +26,7 @@ export function useAuth() {
       setIsSessionLoading(false);
       queryClient.invalidateQueries({ queryKey: ['auth-me'] });
       queryClient.invalidateQueries({ queryKey: ['organisation-me'] });
+      queryClient.invalidateQueries({ queryKey: ['effective-permissions'] });
     });
 
     return () => subscription.unsubscribe();
@@ -60,22 +61,40 @@ export function useAuth() {
     enabled: !!session?.access_token && !!authMe?.organisation_id,
   });
 
+  const {
+    data: permissions,
+    isLoading: isPermissionsLoading,
+  } = useQuery({
+    queryKey: ['effective-permissions', session?.access_token, authMe?.organisation_id],
+    queryFn: () => apiClient<EffectivePermissionsResponse>('/api/v1/organisations/me/effective-permissions'),
+    enabled: !!session?.access_token && !!authMe?.organisation_id,
+  });
+
   const signOut = async () => {
     localStorage.removeItem('zolexora_active_org_id');
     await supabase.auth.signOut();
     queryClient.clear();
   };
 
-  const isCommander = authMe?.is_commander === true;
+  const isCommander = authMe?.is_commander === true || permissions?.is_commander === true;
+
+  const hasPermission = (module: string, page: string, action: string) => {
+    if (isCommander) return true;
+    if (!permissions) return false;
+    const requiredCap = `${module}.${page}.${action}`;
+    return permissions.permissions.includes(requiredCap);
+  };
 
   return {
     session,
     user,
     authMe,
     organisation,
-    isLoading: isSessionLoading || (!!session && (isAuthMeLoading || isOrgLoading)),
+    permissions,
+    isLoading: isSessionLoading || (!!session && (isAuthMeLoading || isOrgLoading || isPermissionsLoading)),
     error: authMeError || orgError,
     isCommander,
+    hasPermission,
     signOut,
   };
 }

@@ -25,6 +25,8 @@ import { VendorSettlementsPage } from './features/billing/VendorSettlementsPage'
 import { FinancialPeriodsPage } from './features/reports/FinancialPeriodsPage';
 import { PnLReportsPage } from './features/reports/PnLReportsPage';
 import { WorkspaceSettingsPage } from './features/organization/WorkspaceSettingsPage';
+import { RolesPage } from './features/organization/RolesPage';
+import { MembersPage } from './features/organization/MembersPage';
 import { OperatingUnitsPage } from './features/operations/OperatingUnitsPage';
 import { R1TikriOperationsPage } from './features/extensions/r1rcm/R1TikriOperationsPage';
 import { AuthCallback } from './features/auth/AuthCallback';
@@ -122,6 +124,9 @@ export function App() {
               <Route path="/reports/pnl" element={<PnLReportsPage />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/settings" element={<WorkspaceSettingsPage />} />
+              <Route path="/settings/roles" element={<RolesPage />} />
+              <Route path="/settings/members" element={<MembersPage />} />
+
               
               {/* Customer Specific Extensions */}
               <Route path="/operations/r1rcm/tikri" element={<R1TikriOperationsPage />} />

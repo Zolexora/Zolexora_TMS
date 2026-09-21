@@ -13,8 +13,19 @@ from app.modules.core.platform.models import (
 )
 from app.modules.identity.organisations.models import Organisation, OrganisationStatus, OrganisationType
 from app.modules.identity.users.models import Profile
-from app.modules.identity.roles.models import Role, Permission, RolePermission
-from app.modules.identity.organisations.membership_models import OrganisationMember, MemberStatus
+from app.modules.identity.roles.models import (
+    PlatformRoleTemplate,
+    PlatformRoleTemplatePermission,
+    OrganisationRole,
+    OrganisationRoleVersion,
+    OrganisationRolePermission,
+    RoleAssignment,
+    UserPermissionOverride,
+    RoleStatus,
+    RoleSource,
+    OverrideType,
+)
+from app.modules.identity.organisations.membership_models import OrganisationMember, MemberStatus, OrganisationInvitation
 
 from app.modules.core.customization.models import (
     OrganisationApplication,
@@ -54,11 +65,22 @@ __all__ = [
     "OrganisationStatus",
     "OrganisationType",
     "Profile",
-    "Role",
-    "Permission",
-    "RolePermission",
+    # Prompt 07: RBAC
+    "PlatformRoleTemplate",
+    "PlatformRoleTemplatePermission",
+    "OrganisationRole",
+    "OrganisationRoleVersion",
+    "OrganisationRolePermission",
+    "RoleAssignment",
+    "UserPermissionOverride",
+    "RoleStatus",
+    "RoleSource",
+    "OverrideType",
+    # Membership
     "OrganisationMember",
     "MemberStatus",
+    "OrganisationInvitation",
+    # Customization
     "OrganisationApplication",
     "ApplicationType",
     "ApplicationStatus",

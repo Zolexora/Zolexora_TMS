@@ -89,6 +89,7 @@ from app.modules.operations.operating_units.routes import router as operating_un
 from app.modules.crm.vendors.routes import router as vendors_router
 
 from fastapi.responses import JSONResponse, RedirectResponse
+from app.modules.identity.roles.routes import router as roles_router
 
 app.include_router(health_router)
 app.include_router(organisations_router)
@@ -105,6 +106,7 @@ app.include_router(r1rcm_router)
 app.include_router(clients_router)
 app.include_router(operating_units_router)
 app.include_router(vendors_router)
+app.include_router(roles_router)
 
 @app.get("/", include_in_schema=False)
 async def root():

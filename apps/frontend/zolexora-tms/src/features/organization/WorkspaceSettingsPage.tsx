@@ -6,7 +6,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 export function WorkspaceSettingsPage() {
-  const { authMe, isCommander, organisation } = useAuth();
+  const { isCommander, organisation } = useAuth();
   const [transferTarget, setTransferTarget] = useState('');
   const [showTransfer, setShowTransfer] = useState(false);
   

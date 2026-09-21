@@ -160,10 +160,11 @@ def require_permission(permission: str) -> Callable:
     return dependency
 
 async def require_commander(user: AuthenticatedUser = Depends(get_current_active_organisation)) -> AuthenticatedUser:
-    if not user.is_creator:
+    """Requires the user to be the Commander of the organisation (not a role check)."""
+    if not user.is_commander:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the Organisation Creator (Commander) can perform this action",
+            detail="Only the Commander can perform this action",
         )
     return user
 

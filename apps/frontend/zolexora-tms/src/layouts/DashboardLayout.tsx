@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Truck,
@@ -20,12 +20,7 @@ import {
 import { useAuth } from '../features/auth/useAuth';
 import { useApplicationRuntime } from '../providers/ApplicationRuntimeProvider';
 
-interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ElementType;
-  badge?: string;
-}
+
 
 const navigation = [
   {
@@ -82,6 +77,9 @@ const navigation = [
     section: 'Administration',
     items: [
       { name: 'Workspace & RBAC', href: '/settings', icon: Settings },
+      { name: 'Roles & Permissions', href: '/settings/roles', icon: Shield },
+      { name: 'Members & Access', href: '/settings/members', icon: Users },
+
       { name: 'Operating Units', href: '/settings/operating-units', icon: Building2 },
     ],
   },
