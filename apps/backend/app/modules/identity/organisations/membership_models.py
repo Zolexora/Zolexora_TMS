@@ -32,7 +32,7 @@ class OrganisationMember(Base, TimestampMixin):
     )
 
     organisation: Mapped["Organisation"] = relationship("Organisation")
-    role: Mapped["Role"] = relationship("app.modules.roles.models.Role", lazy="selectin")
+    role: Mapped["Role"] = relationship("app.modules.identity.roles.models.Role", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("organisation_id", "user_id", name="uq_org_member_org_user"),
