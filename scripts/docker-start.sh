@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Always execute from the repository root
+cd "$(dirname "$0")/.."
+
 ACTION=${1:-start}
 
 if [ "$ACTION" = "stop" ] || [ "$ACTION" = "down" ]; then
