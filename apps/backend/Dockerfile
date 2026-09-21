@@ -16,9 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv for blazing-fast package management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Copy project definition and install dependencies
-COPY pyproject.toml README.md ./
-RUN uv pip install --system -r <(uv pip compile pyproject.toml)
+# Copy project definition and lock file
+COPY pyproject.toml uv.lock README.md ./
+
+# Install dependencies using uv sync
+RUN uv sync --no-dev --frozen
 
 # Copy application source and migration config
 COPY app ./app
@@ -27,5 +29,5 @@ COPY alembic.ini ./
 
 EXPOSE 8000
 
-# Render dynamic PORT execution
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Run the app from the virtual environment
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

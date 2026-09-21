@@ -1,19 +1,52 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS builder
+
 WORKDIR /app
+RUN corepack enable pnpm
 
-COPY package*.json ./
-COPY apps/tms/package*.json ./apps/tms/
-COPY apps/admin/package*.json ./apps/admin/
-RUN npm install
+# Copy workspace config
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 
-FROM base AS tms
-COPY apps/tms ./apps/tms
-RUN npm --prefix apps/tms run build
-EXPOSE 3000
-CMD ["npm", "--prefix", "apps/tms", "run", "start"]
+# Copy frontends
+COPY apps/frontend/tms ./apps/frontend/tms
+COPY apps/frontend/admin ./apps/frontend/admin
 
-FROM base AS admin
-COPY apps/admin ./apps/admin
-RUN npm --prefix apps/admin run build
-EXPOSE 3001
-CMD ["npm", "--prefix", "apps/admin", "run", "start"]
+# Install dependencies (only for frontends)
+RUN pnpm install --filter zolexora-tms --filter zolexora-admin
+
+# Build TMS
+FROM builder AS build-tms
+RUN pnpm --filter zolexora-tms run build
+
+# Build Admin
+FROM builder AS build-admin
+RUN pnpm --filter zolexora-admin run build
+
+# Serve TMS
+FROM nginx:alpine AS tms
+COPY --from=build-tms /app/apps/frontend/tms/dist /usr/share/nginx/html
+# SPA routing fallback for nginx
+RUN echo 'server { \
+    listen 80; \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html; \
+        try_files $uri $uri/ /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+
+# Serve Admin
+FROM nginx:alpine AS admin
+COPY --from=build-admin /app/apps/frontend/admin/dist /usr/share/nginx/html
+# SPA routing fallback for nginx
+RUN echo 'server { \
+    listen 80; \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html; \
+        try_files $uri $uri/ /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
