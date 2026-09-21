@@ -75,6 +75,16 @@ fi
 
 echo "======================================"
 echo "Services are starting! (Press Ctrl+C to stop all)"
+
+if [[ "$SERVICES" == *"tms"* ]]; then
+    echo "- TMS Frontend: http://localhost:3000"
+fi
+if [[ "$SERVICES" == *"admin"* ]]; then
+    echo "- Admin Dashboard: http://localhost:3001"
+fi
+if [[ "$SERVICES" == *"backend"* ]]; then
+    echo "- Backend API: http://localhost:8000/docs"
+fi
 echo "======================================"
 
 # Wait for all background processes to keep the script running
