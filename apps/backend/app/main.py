@@ -85,6 +85,8 @@ from app.modules.core.platform.routes import router as platform_router
 from app.modules.identity.auth.routes import router as auth_router
 from app.modules.core.extensions.r1rcm.routes import router as r1rcm_router
 
+from fastapi.responses import JSONResponse, RedirectResponse
+
 app.include_router(health_router)
 app.include_router(organisations_router)
 app.include_router(users_router)
@@ -97,3 +99,7 @@ app.include_router(billing_router)
 app.include_router(platform_router)
 app.include_router(auth_router)
 app.include_router(r1rcm_router)
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/docs")
