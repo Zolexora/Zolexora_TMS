@@ -9,7 +9,7 @@
 
 set -eo pipefail
 
-WORKSPACE_ROOT="/workspaces/Zolexora_TMS"
+WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOCS_FILE="${WORKSPACE_ROOT}/docs/ECOSYSTEM_CLI_GUIDE.md"
 MCP_CANONICAL="${WORKSPACE_ROOT}/mcp.json"
 DOT_ENV="${WORKSPACE_ROOT}/.env"
@@ -35,6 +35,21 @@ log_header()  { echo -e "\n${CLR_BOLD}${CLR_BLUE}=== $1 ===${CLR_RESET}\n"; }
 # ------------------------------------------------------------------------------
 install_clis() {
   log_header "Installing & Verifying Ecosystem CLIs"
+
+  # Keep the package managers current before installing ecosystem tools.
+  if command -v npm >/dev/null 2>&1; then
+    log_info "Updating npm to the latest version..."
+    sudo npm install -g npm@latest
+  else
+    log_warn "npm not found; skipping npm update."
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    log_info "Updating pip to the latest version..."
+    python3 -m pip install --user --upgrade --ignore-installed pip --break-system-packages
+  else
+    log_warn "python3 not found; skipping pip update."
+  fi
 
   # GitHub CLI
   if command -v gh >/dev/null 2>&1; then
@@ -135,7 +150,7 @@ WRAPPER_EOF
     log_success "Bitwarden CLI (bw): $(bw --version 2>/dev/null)"
   else
     log_warn "Installing Bitwarden CLI globally..."
-    npm install -g @bitwarden/cli
+    sudo npm install -g @bitwarden/cli
   fi
 }
 

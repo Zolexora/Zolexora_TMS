@@ -8,7 +8,10 @@ if git diff --cached --name-only | grep -q "^\.env$"; then
     export $(grep -v '^#' .env.local | xargs)
   fi
 
-  # Unlock vault using API key (requires BW_CLIENTID and BW_CLIENTSECRET in env)
+  # Log in with the API key when available, then unlock with BW_MASTER_PASSWORD.
+  if [ -n "${BW_CLIENTID:-}" ] && [ -n "${BW_CLIENTSECRET:-}" ]; then
+    bw login --apikey >/dev/null 2>&1 || true
+  fi
   BW_SESSION=$(bw unlock --passwordenv BW_MASTER_PASSWORD --raw 2>/dev/null)
 
   if [ -z "$BW_SESSION" ]; then

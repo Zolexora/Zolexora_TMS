@@ -16,6 +16,9 @@ if [ -z "$DOTENV_PRIVATE_KEY" ]; then
         if [ -f .env.local ]; then
             export $(grep -v '^#' .env.local | xargs)
         fi
+        if [ -n "${BW_CLIENTID:-}" ] && [ -n "${BW_CLIENTSECRET:-}" ]; then
+            bw login --apikey >/dev/null 2>&1 || true
+        fi
         BW_SESSION=$(bw unlock --passwordenv BW_MASTER_PASSWORD --raw 2>/dev/null)
         if [ -n "$BW_SESSION" ]; then
             export DOTENV_PRIVATE_KEY=$(bw get notes "ZOLEXORA TMS DOTENV_PRIVATE_KEY" --session "$BW_SESSION" 2>/dev/null)
