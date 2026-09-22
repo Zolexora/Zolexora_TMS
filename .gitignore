@@ -39,3 +39,4 @@ __pycache__/
 # MongoDB VS Code Playgrounds
 mongodb/*.mongodb.js
 mongodb-playground/
+.env.keys
