@@ -189,6 +189,10 @@ args = ["-y", "@cloudinary/asset-management", "mcp", "start"]
 [mcp_servers.github]
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-github"]
+
+[mcp_servers.bitwarden]
+command = "npx"
+args = ["-y", "@bitwarden/mcp"]
 CODEX_CONFIG_EOF
 
   cp "${HOME}/.codex/config.toml" "${WORKSPACE_ROOT}/.codex/config.toml"

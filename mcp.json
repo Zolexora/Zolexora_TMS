@@ -108,6 +108,16 @@
       "args": [
         "/home/codespace/.gemini/config/plugins/ponytail/ponytail-mcp/index.js"
       ]
+    },
+    "bitwarden": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@bitwarden/mcp"
+      ],
+      "env": {
+        "BW_SESSION": "${BW_SESSION}"
+      }
     }
   }
 }
