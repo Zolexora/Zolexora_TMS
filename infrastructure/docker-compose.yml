@@ -17,7 +17,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - ../.env
+      - ../.env.docker
     environment:
       - ENVIRONMENT=development
       - REDIS_URL=redis://redis:6379/0

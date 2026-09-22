@@ -4,6 +4,35 @@ set -e
 # Always execute from the repository root
 cd "$(dirname "$0")/.."
 
+echo "🔐 Checking dotenvx encryption key..."
+if [ -z "$DOTENV_PRIVATE_KEY" ]; then
+    if [ -f .env.keys ]; then
+        echo "   Using local .env.keys file."
+    else
+        echo "   No .env.keys found. Fetching from Bitwarden..."
+        if [ -f .env.local ]; then
+            export $(grep -v '^#' .env.local | xargs)
+        fi
+        BW_SESSION=$(bw unlock --passwordenv BW_MASTER_PASSWORD --raw 2>/dev/null)
+        if [ -n "$BW_SESSION" ]; then
+            export DOTENV_PRIVATE_KEY=$(bw get notes "ZOLEXORA TMS DOTENV_PRIVATE_KEY" --session "$BW_SESSION" 2>/dev/null)
+            echo "   ✅ Key loaded from Bitwarden."
+        else
+            echo "   ❌ Failed to unlock Bitwarden. Cannot decrypt .env file."
+            exit 1
+        fi
+    fi
+fi
+
+echo "📦 Generating decrypted environment for Docker..."
+pnpm dotenvx get --format json 2>/dev/null | jq -r 'to_entries | map("\(.key)=\(.value|tostring)") | .[]' > .env.docker
+
+# Ensure .env.docker gets deleted when the script exits
+cleanup_env() {
+    rm -f .env.docker
+}
+trap cleanup_env EXIT
+
 ACTION=${1:-start}
 
 if [ "$ACTION" = "stop" ] || [ "$ACTION" = "down" ]; then
