@@ -129,6 +129,14 @@ WRAPPER_EOF
     log_warn "Installing OpenAI Codex CLI (@openai/codex)..."
     sudo npm install -g @openai/codex
   fi
+
+  # Bitwarden CLI (bw)
+  if command -v bw >/dev/null 2>&1; then
+    log_success "Bitwarden CLI (bw): $(bw --version 2>/dev/null)"
+  else
+    log_warn "Installing Bitwarden CLI globally..."
+    npm install -g @bitwarden/cli
+  fi
 }
 
 # ------------------------------------------------------------------------------
@@ -318,6 +326,19 @@ run_check() {
       RESEND_AUTH="${CLR_YELLOW}Unauthenticated${CLR_RESET}"
     fi
     printf "%-18s %-16s %-28b %-25s\n" "Resend" "${RESEND_VER}" "${RESEND_AUTH}" "mcp.resend.com (http)"
+  fi
+
+  # Bitwarden
+  if command -v bw >/dev/null 2>&1; then
+    BW_VER="v$(bw --version 2>/dev/null)"
+    if bw login --check 2>&1 | grep -qi "You are logged in"; then
+      BW_AUTH="${CLR_GREEN}Authenticated${CLR_RESET}"
+    else
+      BW_AUTH="${CLR_YELLOW}Unauthenticated${CLR_RESET}"
+    fi
+    printf "%-18s %-16s %-28b %-25s\n" "Bitwarden" "${BW_VER}" "${BW_AUTH}" "secrets (vault)"
+  else
+    printf "%-18s %-16s %-28b %-25s\n" "Bitwarden" "Not Found" "${CLR_RED}Uninstalled${CLR_RESET}" "-"
   fi
 
   echo "--------------------------------------------------------------------------------"
