@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@11.24.0",
   "scripts": {
+    "prepare": "cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit",
     "local:start": "bash scripts/local-start.sh",
     "docker:start": "bash scripts/docker-start.sh start",
     "docker:stop": "bash scripts/docker-start.sh stop",

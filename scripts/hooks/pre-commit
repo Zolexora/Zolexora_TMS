@@ -1,0 +1,7 @@
+#!/bin/sh
+# Auto-encrypt .env before every commit
+if git diff --cached --name-only | grep -q "^\.env$"; then
+  echo "🔐 dotenvx: encrypting .env..."
+  echo "" | pnpm dotenvx encrypt
+  git add -f .env
+fi
