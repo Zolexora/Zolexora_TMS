@@ -62,6 +62,25 @@ case $OPTION in
         ;;
 esac
 
+    ensure_backend_environment() {
+        if ! command -v python3.12 >/dev/null 2>&1; then
+            echo "Installing Python 3.12 and virtualenv support..."
+            sudo apt-get update
+            sudo apt-get install -y python3.12 python3.12-venv
+        fi
+
+        if [ ! -x apps/backend/.venv/bin/python ]; then
+            echo "Creating backend Python 3.12 virtual environment..."
+            python3.12 -m venv apps/backend/.venv
+        fi
+
+        if ! apps/backend/.venv/bin/python -c "import uvicorn" >/dev/null 2>&1; then
+            echo "Installing backend Python dependencies..."
+            apps/backend/.venv/bin/python -m pip install --upgrade pip
+            apps/backend/.venv/bin/python -m pip install -e apps/backend
+        fi
+    }
+
 echo "Starting local services: $SERVICES"
 
 # We will store PIDs so we can kill them all cleanly on Ctrl+C
@@ -80,8 +99,9 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 if [[ "$SERVICES" == *"backend"* ]]; then
+    ensure_backend_environment
     echo "Starting Backend API (port 8000)..."
-    (cd apps/backend && pnpm dotenvx run -- .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000) &
+    PYTHONPATH=apps/backend pnpm dotenvx run -- apps/backend/.venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir apps/backend &
     PIDS="$PIDS $!"
 fi
 
