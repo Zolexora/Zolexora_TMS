@@ -6,6 +6,27 @@ cd "$(dirname "$0")/.."
 echo "======================================"
 echo " Zolexora TMS - Local Development"
 echo "======================================"
+
+echo "🔐 Checking dotenvx encryption key..."
+if [ -z "$DOTENV_PRIVATE_KEY" ]; then
+    if [ -f .env.keys ]; then
+        echo "   Using local .env.keys file."
+    else
+        echo "   No .env.keys found. Fetching from Bitwarden..."
+        if [ -f .env.local ]; then
+            export $(grep -v '^#' .env.local | xargs)
+        fi
+        BW_SESSION=$(bw unlock --passwordenv BW_MASTER_PASSWORD --raw 2>/dev/null)
+        if [ -n "$BW_SESSION" ]; then
+            export DOTENV_PRIVATE_KEY=$(bw get notes "ZOLEXORA TMS DOTENV_PRIVATE_KEY" --session "$BW_SESSION" 2>/dev/null)
+            echo "   ✅ Key loaded from Bitwarden."
+        else
+            echo "   ❌ Failed to unlock Bitwarden. Cannot decrypt .env file."
+            exit 1
+        fi
+    fi
+fi
+
 echo "Which services would you like to start locally?"
 echo "1) All Services (Default)"
 echo "2) Backend API"
@@ -57,19 +78,19 @@ trap cleanup SIGINT SIGTERM
 
 if [[ "$SERVICES" == *"backend"* ]]; then
     echo "Starting Backend API (port 8000)..."
-    (cd apps/backend && .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000) &
+    (cd apps/backend && pnpm dotenvx run -- .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000) &
     PIDS="$PIDS $!"
 fi
 
 if [[ "$SERVICES" == *"tms"* ]]; then
     echo "Starting TMS Frontend..."
-    pnpm --filter zolexora-tms run dev &
+    pnpm dotenvx run -- pnpm --filter zolexora-tms run dev &
     PIDS="$PIDS $!"
 fi
 
 if [[ "$SERVICES" == *"admin"* ]]; then
     echo "Starting Admin Dashboard..."
-    pnpm --filter zolexora-tms-admin run dev &
+    pnpm dotenvx run -- pnpm --filter zolexora-tms-admin run dev &
     PIDS="$PIDS $!"
 fi
 
