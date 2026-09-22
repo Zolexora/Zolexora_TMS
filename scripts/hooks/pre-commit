@@ -3,7 +3,12 @@
 if git diff --cached --name-only | grep -q "^\.env$"; then
   echo "🔐 Fetching DOTENV_PRIVATE_KEY from Bitwarden..."
 
-  # Unlock vault using API key (set BW_CLIENTID and BW_CLIENTSECRET in your shell)
+  # Load personal Bitwarden credentials from .env.local if it exists
+  if [ -f .env.local ]; then
+    export $(grep -v '^#' .env.local | xargs)
+  fi
+
+  # Unlock vault using API key (requires BW_CLIENTID and BW_CLIENTSECRET in env)
   BW_SESSION=$(bw unlock --passwordenv BW_MASTER_PASSWORD --raw 2>/dev/null)
 
   if [ -z "$BW_SESSION" ]; then

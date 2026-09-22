@@ -40,3 +40,4 @@ __pycache__/
 mongodb/*.mongodb.js
 mongodb-playground/
 .env.keys
+.env.local
